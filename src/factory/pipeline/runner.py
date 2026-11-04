@@ -26,6 +26,7 @@ from factory.pipeline import queue
 from factory.pipeline.stage import (
     PermanentStageError,
     RetryableStageError,
+    RevisionRequested,
     StageContext,
     StageResult,
     Workflow,
@@ -101,6 +102,8 @@ class Worker:
             result = stage.run(ctx)
             if not isinstance(result, StageResult):
                 raise PermanentStageError(f"stage returned {type(result).__name__}")
+        except RevisionRequested as exc:
+            return self._request_revision(job_id, stage_name, exc, started)
         except PermanentStageError as exc:
             return self._fail(job_id, stage_name, exc, retryable=False, started=started)
         except RetryableStageError as exc:
@@ -145,6 +148,33 @@ class Worker:
             upstream=upstream,
             record_usage=recorder.record,
         )
+
+    def _request_revision(
+        self, job_id: uuid.UUID, stage_name: str, exc: RevisionRequested, started: float
+    ) -> RunOutcome:
+        if exc.target not in self.workflow.stages or stage_name not in self.workflow.downstream(
+            exc.target
+        ):
+            return self._fail(job_id, stage_name, PermanentStageError(
+                f"invalid revision target {exc.target!r}: {exc}"), retryable=False,
+                started=started)
+        with self.session_scope() as s:
+            job = s.get(ProductionJob, job_id)
+            assert job is not None
+            if job.status == JobStatus.CANCELLED:
+                return RunOutcome(job_id, stage_name, JobStatus.CANCELLED)
+            job.error_class = "RevisionRequested"
+            job.error_message = str(exc)[:4000]
+            # Release this (running) job so retry_stage can reset it to pending with the rest.
+            job.status = JobStatus.PENDING
+            job.locked_by = None
+            job.locked_at = None
+            queue.retry_stage(s, job.episode_id, exc.target, self.workflow)
+            status = job.status  # reset to pending by retry_stage (downstream of target)
+        log.info("revision requested", job_id=str(job_id), stage=stage_name,
+                 target=exc.target, reason=str(exc)[:300],
+                 duration_ms=int((time.perf_counter() - started) * 1000))
+        return RunOutcome(job_id, stage_name, status)
 
     def _fail(
         self, job_id: uuid.UUID, stage_name: str, exc: BaseException, *, retryable: bool,

@@ -1,0 +1,290 @@
+{
+  "$defs": {
+    "Claim": {
+      "properties": {
+        "id": {
+          "pattern": "^C\\d{2}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "category": {
+          "enum": [
+            "scientific",
+            "historical",
+            "numeric",
+            "safety"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "supported",
+            "partially_supported",
+            "unsupported",
+            "contradicted",
+            "opinion"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "minItems": 1,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "simplification_note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Simplification Note"
+        },
+        "is_twist": {
+          "default": false,
+          "title": "Is Twist",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "text",
+        "category",
+        "status",
+        "confidence",
+        "evidence"
+      ],
+      "title": "Claim",
+      "type": "object"
+    },
+    "DurationTarget": {
+      "properties": {
+        "min_s": {
+          "minimum": 30,
+          "title": "Min S",
+          "type": "integer"
+        },
+        "max_s": {
+          "maximum": 900,
+          "title": "Max S",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "min_s",
+        "max_s"
+      ],
+      "title": "DurationTarget",
+      "type": "object"
+    },
+    "Evidence": {
+      "properties": {
+        "source_id": {
+          "title": "Source Id",
+          "type": "string"
+        },
+        "quote": {
+          "maxLength": 200,
+          "minLength": 8,
+          "title": "Quote",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_id",
+        "quote"
+      ],
+      "title": "Evidence",
+      "type": "object"
+    },
+    "Pillar": {
+      "enum": [
+        "nature_living_world",
+        "how_things_work",
+        "science_space",
+        "history_civilization",
+        "curious_mysteries"
+      ],
+      "title": "Pillar",
+      "type": "string"
+    },
+    "Source": {
+      "properties": {
+        "id": {
+          "pattern": "^SRC\\d{2}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "url": {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Url",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "publisher": {
+          "title": "Publisher",
+          "type": "string"
+        },
+        "tier": {
+          "enum": [
+            1,
+            2,
+            3
+          ],
+          "title": "Tier",
+          "type": "integer"
+        },
+        "retrieved_at": {
+          "format": "date",
+          "title": "Retrieved At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "url",
+        "title",
+        "publisher",
+        "tier",
+        "retrieved_at"
+      ],
+      "title": "Source",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "const": "brief.v1",
+      "default": "brief.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "slug": {
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "title": "Slug",
+      "type": "string"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "central_question": {
+      "title": "Central Question",
+      "type": "string"
+    },
+    "pillar": {
+      "$ref": "#/$defs/Pillar"
+    },
+    "target_age_min": {
+      "default": 8,
+      "title": "Target Age Min",
+      "type": "integer"
+    },
+    "target_age_max": {
+      "default": 12,
+      "title": "Target Age Max",
+      "type": "integer"
+    },
+    "learning_objectives": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 4,
+      "minItems": 1,
+      "title": "Learning Objectives",
+      "type": "array"
+    },
+    "storytelling_angle": {
+      "title": "Storytelling Angle",
+      "type": "string"
+    },
+    "twist": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Twist"
+    },
+    "duration": {
+      "$ref": "#/$defs/DurationTarget"
+    },
+    "sources": {
+      "items": {
+        "$ref": "#/$defs/Source"
+      },
+      "minItems": 1,
+      "title": "Sources",
+      "type": "array"
+    },
+    "claims": {
+      "items": {
+        "$ref": "#/$defs/Claim"
+      },
+      "minItems": 1,
+      "title": "Claims",
+      "type": "array"
+    },
+    "verification": {
+      "default": "manual",
+      "enum": [
+        "manual",
+        "agent"
+      ],
+      "title": "Verification",
+      "type": "string"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "slug",
+    "title",
+    "central_question",
+    "pillar",
+    "learning_objectives",
+    "storytelling_angle",
+    "duration",
+    "sources",
+    "claims"
+  ],
+  "title": "TopicBrief",
+  "type": "object"
+}

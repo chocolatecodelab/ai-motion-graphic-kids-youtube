@@ -1,0 +1,56 @@
+# Motion-graphics component catalogue v0. The storyboard may only use these names.
+# status: planned = contract only; implemented = Remotion component exists.
+# Accuracy rule for every component: numbers are drawn only when the storyboard cites claim_ids
+# that state them. With illustrative=true the component draws relative shapes only (no numbers,
+# axes or units).
+# Several are ported from ai-video-editor-remotion (docs/TECH_STACK_DECISION.md reuse map).
+version: components.v0
+components:
+  Label:
+    status: planned
+    purpose: Short on-screen word or caption pointing at something (max 4 words)
+    props: {text: str, target: str}
+  Counter:
+    status: planned
+    purpose: Animated number counting up to a verified value
+    props: {from: number, to: number, unit: str}
+  BarGrow:
+    status: planned
+    purpose: Bars growing to compare a few quantities
+    props: {items: "list of {label, value}"}
+  Orbit:
+    status: planned
+    purpose: Bodies orbiting a centre (planets, moons, electrons)
+    props: {center: str, bodies: "list of str"}
+  ScaleCompare:
+    status: planned
+    purpose: Side-by-side size comparison of two or three things
+    props: {items: "list of {label, relative_size}"}
+  Cutaway:
+    status: planned
+    purpose: Look inside an object or body with a peel-away reveal
+    props: {subject: str, layers: "list of str"}
+  ExplodedView:
+    status: planned
+    purpose: Parts of a machine separating to show how they fit
+    props: {subject: str, parts: "list of str"}
+  Timeline:
+    status: planned
+    purpose: Events in order along a line
+    props: {events: "list of {label, when}"}
+  LightRays:
+    status: planned
+    purpose: Light beams travelling, splitting into colours, or scattering off particles
+    props: {mode: "split|scatter|travel", colors: "list of str"}
+  WaveCompare:
+    status: planned
+    purpose: Two or more waves of different wavelength drawn side by side
+    props: {waves: "list of {label, wavelength_rel, color}"}
+  HologramPanel:
+    status: planned
+    purpose: Needle projects a floating diagram panel with a title and up to 3 bullet icons
+    props: {title: str, items: "list of str"}
+  Recap:
+    status: planned
+    purpose: End-of-episode recap cards, one idea per card (max 3)
+    props: {points: "list of str"}

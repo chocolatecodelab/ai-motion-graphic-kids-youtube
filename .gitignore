@@ -24,6 +24,7 @@ backups/
 logs/
 models/
 voice_bakeoff/output/
+library/cache/
 library/**/*.wav
 library/**/*.mp3
 library/**/*.mp4

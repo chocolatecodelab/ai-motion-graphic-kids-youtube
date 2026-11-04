@@ -2,7 +2,12 @@
 
 *Explore. Wonder. Discover.* An autonomous, observable production system for one original educational animation episode per day, for curious kids aged 8–12.
 
-**Status:** Phase 0 (research & design) is complete. M1 is in progress: foundations (config, DB schema + migrations, logging, `factory doctor`, tests) and the voice bake-off are done.
+**Status:** Phase 0 (research & design) is complete. M1 is in progress. Done so far:
+- foundations: config, DB schema + migrations, logging, `factory doctor`, tests;
+- voice bake-off: Kai = Kokoro `af_heart`, Needle = `af_sky`;
+- job queue, worker and the `claude -p` LLM provider;
+- the brief → script → script review (owner approval) → storyboard stages;
+- voice (Kokoro per line, STT/WER check, line cache) and subtitles (SRT/VTT).
 
 ## Quickstart (Windows, owner machine)
 
@@ -31,6 +36,36 @@ uv run factory doctor
 ```bash
 uv run pytest
 ```
+
+### Run the pilot episode (script → review → your approval → storyboard)
+
+```bash
+uv run factory pilot
+```
+
+```bash
+uv run factory worker --lane llm
+```
+
+```bash
+uv run factory status ep-0001-why-is-the-sky-blue
+```
+
+Read the script and review under `content/<yyyy>/<mm>/ep-0001-why-is-the-sky-blue/` (`script/script.v1.md`, `script_validate/review.v1.md`), then approve and continue:
+
+```bash
+uv run factory approve ep-0001-why-is-the-sky-blue
+```
+
+```bash
+uv run factory worker --lane llm
+```
+
+The storyboard stage also writes a visual review page, `storyboard/storyboard.vN.html`: a timeline, a layout sketch per scene, dialogue, graphics, sound effects and the claims with their sources. Rebuild it any time with `uv run factory storyboard-html <episode>`.
+
+After approval, `uv run factory worker --all-lanes` runs both the storyboard (llm lane) and voice + subtitles (media lane: Kokoro TTS plus a Whisper check). The storyboard page then embeds a player for every voiced line and the full voice-over preview. Open it in a normal browser to play audio. `uv run factory sync <episode>` adds stages that were introduced after an episode was created.
+
+`factory retry <episode> <stage>` re-runs one stage (upstream results are reused). `factory cancel <episode>` stops an episode.
 
 Postgres listens on `127.0.0.1:25432`. The LLM runs through your Claude subscription (`claude -p`), so no API key is needed. See [docs/DECISIONS.md](docs/DECISIONS.md).
 

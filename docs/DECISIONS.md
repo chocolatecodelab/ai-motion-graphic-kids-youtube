@@ -72,6 +72,32 @@ Decisions confirmed by the owner. These take precedence over the defaults propos
 - The bake-off can be reproduced with `voice_bakeoff/run_bakeoff.py`.
 - Set in config as `FACTORY_TTS_HERO_*` / `FACTORY_TTS_COMPANION_*`. Each `character_versions` row also stores `voice_id` + `voice_settings` so episodes stay pinned to the voice they were made with.
 
+## 2026-11-04: Script review gate calibration (from the first live pilot runs)
+
+| Finding | Severity | Effect |
+|---|---|---|
+| Safety or privacy issue | critical | **Stops immediately.** Never auto-revised; a human must decide |
+| Other critical issue, or an unsupported *substantive* fact (mechanism, number, comparison) | critical / major | Blocks. The reviewer writes feedback to `inputs/feedback/script.vN.md` and the script is rewritten automatically, **max 2 rounds**, then it stops for a human |
+| Any review score below 3/5 | — | Blocks (same revision loop) |
+| Everyday knowledge or an exclamation that restates a verified claim | minor | **Warning only**, listed under "Check before approving" in the review report |
+| Major clarity/story issues | major | Warning, listed for the owner |
+
+The owner still approves every script in MANUAL and APPROVAL_REQUIRED mode. In the first pilot run the loop caught "blue waves are short **and quick**" (wrong: all colours travel at the same speed) and fixed it automatically.
+
+## 2026-11-04: Storyboard direction (owner feedback on the pilot storyboard)
+
+The owner approved the pilot storyboard (v2) to continue, with two requirements for the next storyboard iteration:
+
+1. **Video previews, not only text.** Storyboard review should show a short low-res **animatic clip per scene** (540p, placeholder rig + real graphics + voice), not just a text sketch.
+   - Built as soon as the Remotion scene components exist (M1 render step): the storyboard review page embeds one preview clip per scene.
+   - Scene clips are cached by scene hash, so re-reviewing after an edit only re-renders the changed scenes.
+2. **Dynamic, adventure-style staging.** Kai and Needle must not stay parked on the left and right. Storyboard schema v2 will add:
+   - **shot type:** extreme wide, wide, medium, close-up, extreme close-up, over-the-shoulder, POV, insert;
+   - **camera angle:** eye level, low, high, bird's-eye, tilted;
+   - **camera moves:** zoom in/out, dolly, truck, pan/tilt, follow/track, whip pan, crane, rack focus, shake (for impacts), with keyframes over the scene;
+   - **character blocking:** free x/y position, scale and depth (foreground/midground/background), facing direction, entrances and exits, and movement paths during the scene (walk, run, fly, float, shrink or grow), timed to lines;
+   - **a variety rule** checked in code: no more than two consecutive scenes with the same shot type and blocking, and every adventure scene must include movement.
+
 ## 2026-11-04: Media tooling (owner: "use remotion, hyperframes, motion-skill, whisper, ffmpeg, threejs, yt-dlp where best practice says so")
 
 | Tool | Decision | Reason |

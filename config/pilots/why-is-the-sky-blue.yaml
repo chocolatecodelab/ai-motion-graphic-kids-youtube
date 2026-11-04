@@ -1,0 +1,119 @@
+# Pilot episode brief (M1). Written by hand from three tier-1 sources, retrieved 2026-11-04.
+# Quotes were extracted with a fetch tool. M3 adds automatic verbatim-snapshot verification;
+# until then, a human should spot-check each quote against the live page before publication.
+schema_version: brief.v1
+slug: why-is-the-sky-blue
+title: Why Is the Sky Blue?
+central_question: Why is the sky blue?
+pillar: science_space
+target_age_min: 8
+target_age_max: 12
+learning_objectives:
+  - Sunlight looks white but is a mix of all the colours of the rainbow.
+  - Tiny air molecules scatter short-wavelength blue light much more than red light.
+  - At sunset light travels through more air, so even more blue is scattered away and reds and oranges reach our eyes.
+storytelling_angle: >-
+  Kai notices the sky outside the attic window and wonders why it is not purple or green.
+  Needle uses the Discovery Compass to shrink them down so they can ride a sunbeam into the air
+  and watch what happens to each colour when it bumps into air molecules.
+twist: On Mars the daytime sky is orange-red, and sunsets there look blue-grey.
+duration: {min_s: 120, max_s: 180}
+verification: manual
+sources:
+  - id: SRC01
+    url: https://spaceplace.nasa.gov/blue-sky/en/
+    title: Why Is the Sky Blue?
+    publisher: NASA Space Place
+    tier: 1
+    retrieved_at: 2026-11-04
+  - id: SRC02
+    url: https://weather.metoffice.gov.uk/learn-about/weather/optical-effects/why-is-the-sky-blue
+    title: Why the sky is blue and sunsets red
+    publisher: Met Office (UK)
+    tier: 1
+    retrieved_at: 2026-11-04
+  - id: SRC03
+    url: https://www.weather.gov/fgz/SkyBlue
+    title: Why Is The Sky Blue?
+    publisher: NOAA National Weather Service, Flagstaff
+    tier: 1
+    retrieved_at: 2026-11-04
+claims:
+  - id: C01
+    text: Sunlight looks white, but it is really made of all the colours of the rainbow.
+    category: scientific
+    status: supported
+    confidence: 0.97
+    evidence:
+      - {source_id: SRC01, quote: "But it is really made up of all the colors of the rainbow."}
+      - {source_id: SRC02, quote: "is actually made up of many colours, each with a different wavelength."}
+  - id: C02
+    text: Light travels in waves, and each colour has a different wavelength.
+    category: scientific
+    status: supported
+    confidence: 0.95
+    evidence:
+      - {source_id: SRC01, quote: "light energy travels in waves, too."}
+      - {source_id: SRC02, quote: "is actually made up of many colours, each with a different wavelength."}
+  - id: C03
+    text: Blue light waves are shorter than red light waves.
+    category: scientific
+    status: supported
+    confidence: 0.95
+    evidence:
+      - {source_id: SRC01, quote: "Blue light waves are shorter than red light waves."}
+      - {source_id: SRC03, quote: "Red has the longest wavelength, and lowest frequency and energy."}
+  - id: C04
+    text: Air is made of tiny gas molecules, mainly nitrogen and oxygen, much smaller than a light wave.
+    category: scientific
+    status: supported
+    confidence: 0.93
+    evidence:
+      - {source_id: SRC02, quote: "it collides with tiny gas molecules - mainly nitrogen and oxygen."}
+      - {source_id: SRC03, quote: "Gas molecules are smaller than the wavelength of visible light."}
+  - id: C05
+    text: Air molecules scatter blue light in all directions much more than red light. Scientists call this Rayleigh scattering.
+    category: scientific
+    status: supported
+    confidence: 0.97
+    evidence:
+      - {source_id: SRC01, quote: "Blue light is scattered in all directions by the tiny molecules of air"}
+      - {source_id: SRC02, quote: "they scatter shorter wavelengths much more than longer wavelengths."}
+      - {source_id: SRC03, quote: "This process of scattering is known as Rayleigh scattering"}
+  - id: C06
+    text: Violet light is scattered too, but we see a blue sky because our eyes are more sensitive to blue and sunlight has less violet to begin with.
+    category: scientific
+    status: supported
+    confidence: 0.9
+    simplification_note: Simplified; the full answer also involves how the eye's colour receptors combine signals.
+    evidence:
+      - {source_id: SRC03, quote: "violet and blue are scattered most."}
+      - {source_id: SRC02, quote: "our eyes are more sensitive to blue"}
+      - {source_id: SRC02, quote: "less violet in sunlight to begin with."}
+  - id: C07
+    text: At sunset even more blue light is scattered away, so mostly reds, oranges and yellows reach our eyes.
+    category: scientific
+    status: supported
+    confidence: 0.93
+    evidence:
+      - {source_id: SRC01, quote: "allowing the reds and yellows to pass straight through to your eyes."}
+      - {source_id: SRC02, quote: "we see the longer wavelengths—reds and oranges—that create those beautiful sunset and sunrise colours."}
+      - {source_id: SRC03, quote: "All the blue and violet light gets redirected out of your line of sight"}
+  - id: C09
+    text: When the Sun is low in the sky at sunrise and sunset, its light passes through much more air to reach us.
+    category: scientific
+    status: supported
+    confidence: 0.95
+    evidence:
+      - {source_id: SRC01, quote: "As the Sun gets lower in the sky, its light is passing through more of the atmosphere"}
+      - {source_id: SRC02, quote: "passes through a thicker layer of atmosphere"}
+  - id: C08
+    text: On Mars the daytime sky looks orange or reddish, and around sunset the sky near the Sun turns blue-grey.
+    category: scientific
+    status: supported
+    confidence: 0.85
+    is_twist: true
+    simplification_note: Single source (NASA). Good enough for a twist line; avoid adding detail beyond it.
+    evidence:
+      - {source_id: SRC01, quote: "During the daytime, the Martian sky takes on an orange or reddish color."}
+      - {source_id: SRC01, quote: "the sky around the Sun begins to take on a blue-gray tone."}

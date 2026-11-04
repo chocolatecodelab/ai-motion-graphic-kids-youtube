@@ -256,6 +256,28 @@ def test_stale_lease_is_recovered(scope, tmp_path: Path) -> None:  # type: ignor
     assert outcome.status is JobStatus.SUCCEEDED
 
 
+def test_sync_adds_new_stages_to_existing_episode(scope, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
+    ep = _episode(scope)
+    _worker(scope, Lane.LLM, tmp_path).run_until_idle()
+    _worker(scope, Lane.MEDIA, tmp_path).run_until_idle()
+
+    class Subtitles(Stage):
+        name, lane, depends_on = "subtitles", Lane.MEDIA, ("voice",)
+
+        def run(self, ctx: StageContext) -> StageResult:
+            return StageResult({"srt": "en.srt"})
+
+    class Render(Stage):
+        name, lane, depends_on = "render", Lane.RENDER, ("subtitles",)
+
+    grown = Workflow([Research(), Script(), Voice(), Subtitles(), Render()])
+    with scope() as s:
+        added = {j.stage: j.status for j in queue.sync_episode_jobs(s, ep, grown)}
+        assert added == {"subtitles": JobStatus.QUEUED, "render": JobStatus.PENDING}
+        assert s.get(Episode, ep).status is EpisodeStatus.IN_PRODUCTION
+        assert queue.sync_episode_jobs(s, ep, grown) == []  # idempotent
+
+
 def test_backoff_is_capped() -> None:
     import random
 

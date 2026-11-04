@@ -14,6 +14,8 @@ Each milestone ends with: tests green, a demo, measured results, updated docs, a
 | **M7 Production trial → daily** | Reliability at cadence | Trial (14 eps at 3/week, then 7 daily), monitoring/alerts, backups/restore drill, Shorts derivation (optional) | Stage D exit criteria (TESTING_STRATEGY.md) met → enable daily schedule | 4–5 wks calendar |
 | Later | Scale & polish | FULL_AUTOMATION (owner-enabled after ≥ 30 clean eps), 4K, S3 storage, Celery if multi-host, additional pillars/formats | — | — |
 
+> **Added 2026-11-04 (owner, see DECISIONS.md):** M1's Remotion step also delivers storyboard schema v2 (shot types, camera angles/moves, character blocking with movement paths, plus a variety check) and **per-scene animatic preview clips** embedded in the storyboard review page.
+
 ## Parallel non-code track (start immediately: long lead times)
 1. Google Cloud project, YouTube Data API enabled, **apply for the API compliance audit**.
 2. OAuth consent screen → production + verification for the YouTube scopes.

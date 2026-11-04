@@ -74,6 +74,42 @@ def enqueue_episode(
     return jobs
 
 
+def sync_episode_jobs(
+    session: Session, episode_id: uuid.UUID, workflow: Workflow
+) -> list[ProductionJob]:
+    """Add jobs for stages the workflow gained after the episode was created.
+
+    New jobs start queued if all their dependencies already succeeded, else pending.
+    """
+    existing = {
+        j.stage for j in session.scalars(
+            select(ProductionJob).where(ProductionJob.episode_id == episode_id))
+    }
+    added: list[ProductionJob] = []
+    for name in workflow.order:
+        if name in existing:
+            continue
+        stage = workflow.stages[name]
+        deps_done = all(
+            (j := _job(session, episode_id, d)) is not None and j.status == JobStatus.SUCCEEDED
+            for d in stage.depends_on
+        )
+        job = ProductionJob(
+            episode_id=episode_id, stage=name, stage_version=stage.version, lane=stage.lane,
+            status=JobStatus.QUEUED if deps_done else JobStatus.PENDING,
+            max_attempts=stage.max_attempts, run_after=utcnow(),
+        )
+        session.add(job)
+        session.flush()
+        added.append(job)
+    if added:
+        episode = session.get(Episode, episode_id)
+        if episode is not None and episode.status == EpisodeStatus.READY:
+            episode.status = EpisodeStatus.IN_PRODUCTION
+        session.flush()
+    return added
+
+
 def claim_next(
     session: Session, lane: Lane, worker_id: str, now: datetime | None = None
 ) -> ProductionJob | None:

@@ -1,0 +1,399 @@
+{
+  "$defs": {
+    "Background": {
+      "properties": {
+        "library_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Reuse an existing library scene",
+          "title": "Library Id"
+        },
+        "asset_request": {
+          "anyOf": [
+            {
+              "maxLength": 300,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Description of a new background (vector style, no text)",
+          "title": "Asset Request"
+        },
+        "parallax_layers": {
+          "default": 3,
+          "maximum": 5,
+          "minimum": 1,
+          "title": "Parallax Layers",
+          "type": "integer"
+        }
+      },
+      "title": "Background",
+      "type": "object"
+    },
+    "Camera": {
+      "properties": {
+        "move": {
+          "default": "static",
+          "enum": [
+            "static",
+            "push_in",
+            "pull_out",
+            "pan",
+            "parallax",
+            "orbit"
+          ],
+          "title": "Move",
+          "type": "string"
+        },
+        "zoom_from": {
+          "default": 1.0,
+          "maximum": 3.0,
+          "minimum": 0.5,
+          "title": "Zoom From",
+          "type": "number"
+        },
+        "zoom_to": {
+          "default": 1.0,
+          "maximum": 3.0,
+          "minimum": 0.5,
+          "title": "Zoom To",
+          "type": "number"
+        },
+        "easing": {
+          "default": "ease_in_out",
+          "enum": [
+            "linear",
+            "ease_in",
+            "ease_out",
+            "ease_in_out",
+            "spring"
+          ],
+          "title": "Easing",
+          "type": "string"
+        }
+      },
+      "title": "Camera",
+      "type": "object"
+    },
+    "CharacterAction": {
+      "properties": {
+        "character": {
+          "enum": [
+            "kai",
+            "needle"
+          ],
+          "title": "Character",
+          "type": "string"
+        },
+        "pose": {
+          "description": "Rig pose ID from the rig contract",
+          "title": "Pose",
+          "type": "string"
+        },
+        "expression": {
+          "description": "Rig expression ID from the rig contract",
+          "title": "Expression",
+          "type": "string"
+        },
+        "action": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional rig action ID",
+          "title": "Action"
+        },
+        "position": {
+          "default": "left",
+          "enum": [
+            "left",
+            "center",
+            "right",
+            "offscreen"
+          ],
+          "title": "Position",
+          "type": "string"
+        }
+      },
+      "required": [
+        "character",
+        "pose",
+        "expression"
+      ],
+      "title": "CharacterAction",
+      "type": "object"
+    },
+    "MotionGraphic": {
+      "properties": {
+        "component": {
+          "description": "Component name from the catalogue",
+          "title": "Component",
+          "type": "string"
+        },
+        "props": {
+          "additionalProperties": true,
+          "title": "Props",
+          "type": "object"
+        },
+        "at_line": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Line ID that triggers it",
+          "title": "At Line"
+        },
+        "illustrative": {
+          "default": false,
+          "description": "True if numbers in props are only relative shapes for a qualitative idea. The renderer then shows no numbers, axes or units.",
+          "title": "Illustrative",
+          "type": "boolean"
+        },
+        "claim_ids": {
+          "description": "Verified claims that state the numbers shown (required unless illustrative)",
+          "items": {
+            "type": "string"
+          },
+          "title": "Claim Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "component"
+      ],
+      "title": "MotionGraphic",
+      "type": "object"
+    },
+    "SoundEffect": {
+      "properties": {
+        "id": {
+          "description": "Descriptive SFX id, e.g. whoosh_soft",
+          "maxLength": 60,
+          "title": "Id",
+          "type": "string"
+        },
+        "at_line": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "At Line"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "SoundEffect",
+      "type": "object"
+    },
+    "StoryboardScene": {
+      "properties": {
+        "scene_id": {
+          "pattern": "^S\\d{2}$",
+          "title": "Scene Id",
+          "type": "string"
+        },
+        "beat": {
+          "enum": [
+            "hook",
+            "mystery",
+            "adventure",
+            "discovery",
+            "twist",
+            "takeaway"
+          ],
+          "title": "Beat",
+          "type": "string"
+        },
+        "objective": {
+          "maxLength": 200,
+          "title": "Objective",
+          "type": "string"
+        },
+        "duration_s": {
+          "exclusiveMinimum": 0,
+          "maximum": 120,
+          "title": "Duration S",
+          "type": "number"
+        },
+        "line_ids": {
+          "description": "Script line IDs spoken in this scene, in order",
+          "items": {
+            "type": "string"
+          },
+          "title": "Line Ids",
+          "type": "array"
+        },
+        "characters": {
+          "items": {
+            "$ref": "#/$defs/CharacterAction"
+          },
+          "maxItems": 2,
+          "minItems": 1,
+          "title": "Characters",
+          "type": "array"
+        },
+        "background": {
+          "$ref": "#/$defs/Background"
+        },
+        "camera": {
+          "$ref": "#/$defs/Camera",
+          "default": {
+            "move": "static",
+            "zoom_from": 1.0,
+            "zoom_to": 1.0,
+            "easing": "ease_in_out"
+          }
+        },
+        "motion_graphics": {
+          "items": {
+            "$ref": "#/$defs/MotionGraphic"
+          },
+          "title": "Motion Graphics",
+          "type": "array"
+        },
+        "sfx": {
+          "items": {
+            "$ref": "#/$defs/SoundEffect"
+          },
+          "title": "Sfx",
+          "type": "array"
+        },
+        "transition_out": {
+          "$ref": "#/$defs/Transition",
+          "default": {
+            "type": "cut",
+            "duration_s": 0.5
+          }
+        },
+        "educational_purpose": {
+          "maxLength": 200,
+          "title": "Educational Purpose",
+          "type": "string"
+        }
+      },
+      "required": [
+        "scene_id",
+        "beat",
+        "objective",
+        "duration_s",
+        "line_ids",
+        "characters",
+        "background",
+        "educational_purpose"
+      ],
+      "title": "StoryboardScene",
+      "type": "object"
+    },
+    "Transition": {
+      "properties": {
+        "type": {
+          "default": "cut",
+          "enum": [
+            "compass_portal",
+            "wipe",
+            "cut",
+            "zoom_through",
+            "fade"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "duration_s": {
+          "default": 0.5,
+          "maximum": 3,
+          "minimum": 0,
+          "title": "Duration S",
+          "type": "number"
+        }
+      },
+      "title": "Transition",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "const": "storyboard.v1",
+      "default": "storyboard.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "episode_slug": {
+      "title": "Episode Slug",
+      "type": "string"
+    },
+    "script_version": {
+      "title": "Script Version",
+      "type": "integer"
+    },
+    "fps": {
+      "default": 30,
+      "title": "Fps",
+      "type": "integer"
+    },
+    "width": {
+      "default": 1920,
+      "title": "Width",
+      "type": "integer"
+    },
+    "height": {
+      "default": 1080,
+      "title": "Height",
+      "type": "integer"
+    },
+    "scenes": {
+      "items": {
+        "$ref": "#/$defs/StoryboardScene"
+      },
+      "title": "Scenes",
+      "type": "array"
+    },
+    "total_duration_s": {
+      "title": "Total Duration S",
+      "type": "number"
+    },
+    "catalogue_version": {
+      "title": "Catalogue Version",
+      "type": "string"
+    },
+    "rig_version": {
+      "title": "Rig Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "episode_slug",
+    "script_version",
+    "scenes",
+    "total_duration_s",
+    "catalogue_version",
+    "rig_version"
+  ],
+  "title": "Storyboard",
+  "type": "object"
+}

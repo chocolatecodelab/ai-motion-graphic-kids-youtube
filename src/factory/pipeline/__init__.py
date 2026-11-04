@@ -1,6 +1,7 @@
 from factory.pipeline.stage import (
     PermanentStageError,
     RetryableStageError,
+    RevisionRequested,
     Stage,
     StageContext,
     StageError,
@@ -11,6 +12,7 @@ from factory.pipeline.stage import (
 __all__ = [
     "PermanentStageError",
     "RetryableStageError",
+    "RevisionRequested",
     "Stage",
     "StageContext",
     "StageError",

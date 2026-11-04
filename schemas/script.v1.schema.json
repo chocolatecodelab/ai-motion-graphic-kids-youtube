@@ -1,0 +1,288 @@
+{
+  "$defs": {
+    "LineRef": {
+      "properties": {
+        "line_id": {
+          "title": "Line Id",
+          "type": "string"
+        },
+        "scene_key": {
+          "title": "Scene Key",
+          "type": "string"
+        },
+        "speaker": {
+          "enum": [
+            "kai",
+            "needle"
+          ],
+          "title": "Speaker",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "emotion": {
+          "enum": [
+            "neutral",
+            "curious",
+            "excited",
+            "surprised",
+            "puzzled",
+            "determined",
+            "delighted",
+            "playful",
+            "thoughtful"
+          ],
+          "title": "Emotion",
+          "type": "string"
+        },
+        "claim_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Claim Ids",
+          "type": "array"
+        },
+        "direction": {
+          "title": "Direction",
+          "type": "string"
+        },
+        "est_duration_s": {
+          "title": "Est Duration S",
+          "type": "number"
+        }
+      },
+      "required": [
+        "line_id",
+        "scene_key",
+        "speaker",
+        "text",
+        "emotion",
+        "claim_ids",
+        "direction",
+        "est_duration_s"
+      ],
+      "title": "LineRef",
+      "type": "object"
+    },
+    "ScriptDraft": {
+      "description": "What the LLM returns (structured output).",
+      "properties": {
+        "title_working": {
+          "maxLength": 100,
+          "title": "Title Working",
+          "type": "string"
+        },
+        "learning_objectives": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 4,
+          "minItems": 1,
+          "title": "Learning Objectives",
+          "type": "array"
+        },
+        "scenes": {
+          "items": {
+            "$ref": "#/$defs/ScriptScene"
+          },
+          "maxItems": 24,
+          "minItems": 6,
+          "title": "Scenes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "title_working",
+        "learning_objectives",
+        "scenes"
+      ],
+      "title": "ScriptDraft",
+      "type": "object"
+    },
+    "ScriptLine": {
+      "properties": {
+        "speaker": {
+          "enum": [
+            "kai",
+            "needle"
+          ],
+          "title": "Speaker",
+          "type": "string"
+        },
+        "text": {
+          "maxLength": 400,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "emotion": {
+          "default": "neutral",
+          "enum": [
+            "neutral",
+            "curious",
+            "excited",
+            "surprised",
+            "puzzled",
+            "determined",
+            "delighted",
+            "playful",
+            "thoughtful"
+          ],
+          "title": "Emotion",
+          "type": "string"
+        },
+        "claim_ids": {
+          "description": "IDs of verified claims this line states",
+          "items": {
+            "type": "string"
+          },
+          "title": "Claim Ids",
+          "type": "array"
+        },
+        "direction": {
+          "default": "",
+          "description": "Short acting/visual note, not spoken",
+          "maxLength": 200,
+          "title": "Direction",
+          "type": "string"
+        }
+      },
+      "required": [
+        "speaker",
+        "text"
+      ],
+      "title": "ScriptLine",
+      "type": "object"
+    },
+    "ScriptScene": {
+      "properties": {
+        "key": {
+          "description": "S01, S02, ...",
+          "pattern": "^S\\d{2}$",
+          "title": "Key",
+          "type": "string"
+        },
+        "beat": {
+          "enum": [
+            "hook",
+            "mystery",
+            "adventure",
+            "discovery",
+            "twist",
+            "takeaway"
+          ],
+          "title": "Beat",
+          "type": "string"
+        },
+        "location": {
+          "maxLength": 120,
+          "title": "Location",
+          "type": "string"
+        },
+        "summary": {
+          "maxLength": 300,
+          "title": "Summary",
+          "type": "string"
+        },
+        "lines": {
+          "items": {
+            "$ref": "#/$defs/ScriptLine"
+          },
+          "minItems": 1,
+          "title": "Lines",
+          "type": "array"
+        },
+        "sound_cues": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Sound Cues",
+          "type": "array"
+        },
+        "visual_opportunities": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Visual Opportunities",
+          "type": "array"
+        }
+      },
+      "required": [
+        "key",
+        "beat",
+        "location",
+        "summary",
+        "lines"
+      ],
+      "title": "ScriptScene",
+      "type": "object"
+    }
+  },
+  "description": "Stored artifact: the draft plus code-derived fields (line IDs, metrics).",
+  "properties": {
+    "schema_version": {
+      "const": "script.v1",
+      "default": "script.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "episode_slug": {
+      "title": "Episode Slug",
+      "type": "string"
+    },
+    "version": {
+      "title": "Version",
+      "type": "integer"
+    },
+    "draft": {
+      "$ref": "#/$defs/ScriptDraft"
+    },
+    "lines": {
+      "items": {
+        "$ref": "#/$defs/LineRef"
+      },
+      "title": "Lines",
+      "type": "array"
+    },
+    "word_count": {
+      "title": "Word Count",
+      "type": "integer"
+    },
+    "est_duration_s": {
+      "title": "Est Duration S",
+      "type": "number"
+    },
+    "readability": {
+      "additionalProperties": {
+        "type": "number"
+      },
+      "title": "Readability",
+      "type": "object"
+    },
+    "validation_warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Validation Warnings",
+      "type": "array"
+    },
+    "revisions_used": {
+      "default": 0,
+      "title": "Revisions Used",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "episode_slug",
+    "version",
+    "draft",
+    "lines",
+    "word_count",
+    "est_duration_s",
+    "readability"
+  ],
+  "title": "Script",
+  "type": "object"
+}

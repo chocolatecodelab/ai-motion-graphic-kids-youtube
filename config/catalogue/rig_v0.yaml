@@ -1,0 +1,16 @@
+# Rig contract v0 (placeholder vector puppets for M1). The storyboard may only use these IDs.
+# Final rigs are designed in M2 (Character Bible v1); IDs here stay stable or get migrated.
+version: rig.v0
+characters:
+  kai:
+    display_name: Kai
+    role: hero
+    poses: [idle, talk, point, think, surprised, celebrate, walk, hold_compass, crouch, look_up]
+    expressions: [neutral, curious, surprised, delighted, puzzled, determined]
+    actions: [wave, nod, jump, gasp, look_around, tap_compass, shrug, scratch_head]
+  needle:
+    display_name: Needle
+    role: companion
+    poses: [float, zip, glow, spin, peek, bounce]
+    expressions: [neutral, curious, surprised, delighted, puzzled, determined]
+    actions: [sparkle, loop_the_loop, dim, flash, wiggle]

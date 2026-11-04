@@ -31,6 +31,18 @@ class PermanentStageError(StageError):
     """Validation/policy failure or bad input. Not retried; needs a human or upstream fix."""
 
 
+class RevisionRequested(StageError):
+    """A reviewing stage rejected an upstream artifact with actionable feedback.
+
+    The runner re-queues `target` (which reads the feedback the reviewer saved) and
+    resets everything downstream of it, including the reviewer.
+    """
+
+    def __init__(self, target: str, message: str):
+        super().__init__(message)
+        self.target = target
+
+
 @dataclass(frozen=True)
 class StageContext:
     episode_id: uuid.UUID
