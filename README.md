@@ -4,7 +4,7 @@
 
 **Status: Phase 0 (research & design) complete. No production code yet.**
 
-Start here: [docs/TECHNICAL_ASSESSMENT.md](docs/TECHNICAL_ASSESSMENT.md)
+Start here: [docs/TECHNICAL_ASSESSMENT.md](docs/TECHNICAL_ASSESSMENT.md) · Owner decisions (override defaults): [docs/DECISIONS.md](docs/DECISIONS.md)
 
 | Document | Purpose |
 |---|---|

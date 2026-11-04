@@ -1,5 +1,7 @@
 # Cost Estimation (summary)
 
+> **Update 2026-11-04 ([DECISIONS.md](DECISIONS.md) D2):** the owner chose a free-first stack (Claude subscription via `claude -p`, Kokoro TTS, SVG-authored scenes, procedural audio, free Remotion licence, own computer). Marginal cost per episode is therefore about **$0**, and the limits are subscription usage and local compute. The paid-stack figures below remain the reference for any future paid upgrade.
+
 Full derivation: [research/production-cost-analysis.md](research/production-cost-analysis.md). Figures are estimates until M1 measures real usage.
 
 | Metric | Estimate |

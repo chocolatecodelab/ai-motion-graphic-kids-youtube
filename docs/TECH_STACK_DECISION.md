@@ -1,5 +1,7 @@
 # Tech Stack Decisions (ADR-style)
 
+> Rows 4, 11, 12, 13, 15 and 22 are refined by owner decisions in [DECISIONS.md](DECISIONS.md): free-first providers, 2D vector puppet, own computer.
+
 Each decision lists: context → decision → alternatives → revisit trigger.
 
 | # | Area | Decision | Alternatives considered | Revisit when |
