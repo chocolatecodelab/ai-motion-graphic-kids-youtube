@@ -60,6 +60,18 @@ Decisions confirmed by the owner. These take precedence over the defaults propos
 | Tools present | Python 3.12, Node 24, FFmpeg 9.0.1, Docker 29.5, Claude Code CLI 2.1.x | `factory doctor` checks all of these |
 | Ports | 5432/15432/55432 already used by other local apps | Project Postgres is mapped to **127.0.0.1:25432** |
 
+## 2026-11-04: Character voices (owner pick from the Kokoro bake-off)
+
+| Character | Kokoro voice | Speed | Bake-off speed on this CPU |
+|---|---|---|---|
+| **Kai** (hero) | `af_heart` | 1.0 | 1.26× real time (fastest of six candidates) |
+| **Needle** (companion) | `af_sky` | 1.1 | 0.79× real time |
+
+- Stock voices only (no cloning). Kokoro-82M weights are Apache-2.0.
+- Word timestamps were returned for every line, so they can drive subtitles and lip-sync.
+- The bake-off can be reproduced with `voice_bakeoff/run_bakeoff.py`.
+- Set in config as `FACTORY_TTS_HERO_*` / `FACTORY_TTS_COMPANION_*`. Each `character_versions` row also stores `voice_id` + `voice_settings` so episodes stay pinned to the voice they were made with.
+
 ## 2026-11-04: Media tooling (owner: "use remotion, hyperframes, motion-skill, whisper, ffmpeg, threejs, yt-dlp where best practice says so")
 
 | Tool | Decision | Reason |

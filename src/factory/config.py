@@ -38,16 +38,25 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+psycopg://factory:factory_dev_password@127.0.0.1:25432/factory"
 
-    # --- publication safety (master prompt Â§11)
+    # --- publication safety (master prompt section 11)
     publication_mode: PublicationMode = PublicationMode.APPROVAL_REQUIRED
     full_automation_enabled: bool = False
 
     # --- providers (free-first, DECISIONS.md D2)
-    llm_provider: str = "claude_cli"  # claude_cli | anthropic_api (paid adapter, off by default)
+    llm_provider: str = "claude_cli"  # claude_cli | fake (tests) | anthropic_api (paid, later)
     claude_cli_path: str = "claude"
+    # Model alias per tier, passed to `claude -p --model`. Empty = CLI default.
+    llm_model_high: str = "opus"     # script, fact-check adjudication, final content QA
+    llm_model_medium: str = "sonnet"  # storyboard, visual plan, research
+    llm_model_low: str = "haiku"     # classification, SEO tags, cheap validation
+    llm_timeout_s: int = Field(default=900, ge=10)
+
+    # Voices chosen by the owner in the 2026-11-04 bake-off (DECISIONS.md).
     tts_provider: str = "kokoro"
-    tts_hero_voice: str = ""
-    tts_companion_voice: str = ""
+    tts_hero_voice: str = "af_heart"      # Kai
+    tts_hero_speed: float = Field(default=1.0, gt=0.5, lt=2.0)
+    tts_companion_voice: str = "af_sky"   # Needle
+    tts_companion_speed: float = Field(default=1.1, gt=0.5, lt=2.0)
 
     # --- budgets (USD; soft = notify, hard = pause queue). Marginal cost is ~$0 on the
     # free-first stack; these guard any paid adapter that gets switched on.

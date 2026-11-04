@@ -21,7 +21,6 @@ from typing import Any
 from sqlalchemy import (
     BigInteger,
     Boolean,
-    DateTime,
     Enum,
     ForeignKey,
     Index,
@@ -37,7 +36,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from factory.config import PublicationMode
-from factory.db.base import Base, IdTimestampMixin, JSONType, utcnow
+from factory.db.base import Base, IdTimestampMixin, JSONType, UTCDateTime, utcnow
 
 
 def _enum(e: type[StrEnum], name: str) -> Enum:
@@ -187,7 +186,7 @@ class Channel(IdTimestampMixin, Base):
     publication_mode: Mapped[PublicationMode] = mapped_column(
         _enum(PublicationMode, "publication_mode"), default=PublicationMode.APPROVAL_REQUIRED
     )
-    full_automation_enabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    full_automation_enabled_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     full_automation_enabled_by: Mapped[str | None] = mapped_column(String(120))
     brand_tokens: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
 
@@ -247,7 +246,7 @@ class CharacterVersion(IdTimestampMixin, Base):
     voice_provider: Mapped[str | None] = mapped_column(String(64))
     voice_id: Mapped[str | None] = mapped_column(String(128))
     voice_settings: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
-    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    approved_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     approved_by: Mapped[str | None] = mapped_column(String(120))
 
     character: Mapped[Character] = relationship(back_populates="versions")
@@ -315,11 +314,11 @@ class Episode(IdTimestampMixin, Base):
     status: Mapped[EpisodeStatus] = mapped_column(
         _enum(EpisodeStatus, "episode_status"), default=EpisodeStatus.PLANNED
     )
-    planned_publish_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    planned_publish_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     publish_slot_date: Mapped[str | None] = mapped_column(String(10))  # YYYY-MM-DD, channel tz
     storage_prefix: Mapped[str | None] = mapped_column(String(500))
     total_cost_usd: Mapped[Decimal] = mapped_column(Numeric(10, 4), default=Decimal("0"))
-    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    cancelled_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
     project: Mapped[Project] = relationship(back_populates="episodes")
     jobs: Mapped[list[ProductionJob]] = relationship(back_populates="episode")
@@ -354,11 +353,11 @@ class ProductionJob(IdTimestampMixin, Base):
     output_refs: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
     error_class: Mapped[str | None] = mapped_column(String(120))
     error_message: Mapped[str | None] = mapped_column(Text)
-    run_after: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    run_after: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow)
     locked_by: Mapped[str | None] = mapped_column(String(120))
-    locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    locked_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    started_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    finished_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     requires_approval: Mapped[bool] = mapped_column(Boolean, default=False)
 
     episode: Mapped[Episode] = relationship(back_populates="jobs")
@@ -495,7 +494,7 @@ class Approval(IdTimestampMixin, Base):
     )
     notes: Mapped[str | None] = mapped_column(Text)
     decided_by: Mapped[str] = mapped_column(String(120))
-    decided_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    decided_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow)
     target_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
 
 
@@ -518,7 +517,7 @@ class SystemLog(IdTimestampMixin, Base):
     __tablename__ = "system_logs"
     __table_args__ = (Index("ix_system_logs_ts", "ts"),)
 
-    ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    ts: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow)
     level: Mapped[str] = mapped_column(String(16))
     logger: Mapped[str] = mapped_column(String(120))
     episode_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
