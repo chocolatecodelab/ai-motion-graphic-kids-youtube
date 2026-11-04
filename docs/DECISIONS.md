@@ -48,3 +48,26 @@ Decisions confirmed by the owner. These take precedence over the defaults propos
   - Kokoro (CPU) vs Chatterbox (GPU);
   - whether local FLUX is an option.
 - Backups: Postgres dump + `content/` sync to an external disk or cloud drive.
+
+## 2026-11-04: Production host inspected (answers the D3 open question)
+
+| Item | Found | Consequence |
+|---|---|---|
+| OS | Windows 11 Home (native; no WSL2 needed) | Python via `uv`, Postgres in Docker Desktop, scheduled runs via Windows Task Scheduler |
+| CPU / RAM | AMD Ryzen 5 5500U (6C/12T), 15.4 GB | Remotion renders on CPU. M1 must measure real fps |
+| GPU | Integrated AMD Radeon. **No NVIDIA/CUDA** | **Kokoro on CPU** is the voice. Chatterbox and local FLUX are **not viable** here (GPU-only, per D2) |
+| Disk | ~717 GB free on D: | Enough for the content working set and backups |
+| Tools present | Python 3.12, Node 24, FFmpeg 9.0.1, Docker 29.5, Claude Code CLI 2.1.x | `factory doctor` checks all of these |
+| Ports | 5432/15432/55432 already used by other local apps | Project Postgres is mapped to **127.0.0.1:25432** |
+
+## 2026-11-04: Media tooling (owner: "use remotion, hyperframes, motion-skill, whisper, ffmpeg, threejs, yt-dlp where best practice says so")
+
+| Tool | Decision | Reason |
+|---|---|---|
+| **Remotion 4** | ✅ Core renderer | Typed React components fit a reusable template library driven by storyboard JSON. Code from `ai-video-editor-remotion` can be ported. Free licence (D4) |
+| **HyperFrames** (HeyGen, Apache-2.0, HTML→MP4) | ⏸ Evaluated, not adopted now. Kept as the documented fallback renderer | It does the same job as Remotion (headless Chrome + FFmpeg). Running two renderers doubles the template work. Its licence has no headcount threshold, so it is the exit route if the business grows beyond Remotion's free tier (>3 people). The storyboard JSON contract stays renderer-agnostic so a switch is possible |
+| **Motion skills** (agent skills for motion design) | ✅ Dev-time only | The Remotion agent skills (`remotion-best-practices` etc.) guide Claude while writing components. They are not a runtime dependency. If "motion-skill" means a specific package, the owner should name it |
+| **Whisper** (faster-whisper / WhisperX, local CPU) | ✅ QA + alignment | Transcript-vs-script WER check, subtitle timing fallback, lip-sync alignment. Already in D2 |
+| **FFmpeg** | ✅ Core | Mixing, loudness (R128), concat, encode, blackdetect/silencedetect/freezedetect QA |
+| **Three.js** via `@remotion/three` | ✅ Selective, inside Remotion only | For scenes that really need 3D: planets/orbits, the Sun's layers, molecules, exploded machines. Not for the characters (they stay 2D vector puppets, D5). Uses CPU software WebGL here, so render cost must be measured per component and cached per scene |
+| **yt-dlp** | ❌ Not in the pipeline | YouTube's Terms of Service don't allow downloading videos without permission, and we must never reuse competitor footage. Competitor research uses the **YouTube Data API** for metadata (titles, durations, views, upload cadence, thumbnail URLs for side-by-side review only). Our own videos can be fetched through YouTube Studio / API if ever needed |

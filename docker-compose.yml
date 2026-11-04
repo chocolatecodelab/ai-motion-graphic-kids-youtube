@@ -1,0 +1,23 @@
+name: ai-kids-factory
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: factory
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-factory_dev_password}
+      POSTGRES_DB: factory
+    ports:
+      # Bound to localhost only. 25432 avoids clashing with other local Postgres instances.
+      - "127.0.0.1:25432:5432"
+    volumes:
+      - factory_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U factory -d factory"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  factory_pgdata:

@@ -2,7 +2,37 @@
 
 *Explore. Wonder. Discover.* An autonomous, observable production system for one original educational animation episode per day, for curious kids aged 8–12.
 
-**Status: Phase 0 (research & design) complete. No production code yet.**
+**Status:** Phase 0 (research & design) is complete. M1 is in progress: foundations (config, DB schema + migrations, logging, `factory doctor`, tests) and the voice bake-off are done.
+
+## Quickstart (Windows, owner machine)
+
+Prerequisites: Python 3.12 + [uv](https://docs.astral.sh/uv/), Docker Desktop, Node 22+, FFmpeg, Claude Code CLI (`claude`).
+
+```bash
+copy .env.example .env
+```
+
+```bash
+docker compose up -d postgres
+```
+
+```bash
+uv sync --extra voice
+```
+
+```bash
+uv run alembic upgrade head
+```
+
+```bash
+uv run factory doctor
+```
+
+```bash
+uv run pytest
+```
+
+Postgres listens on `127.0.0.1:25432`. The LLM runs through your Claude subscription (`claude -p`), so no API key is needed. See [docs/DECISIONS.md](docs/DECISIONS.md).
 
 Start here: [docs/TECHNICAL_ASSESSMENT.md](docs/TECHNICAL_ASSESSMENT.md) · Owner decisions (override defaults): [docs/DECISIONS.md](docs/DECISIONS.md)
 

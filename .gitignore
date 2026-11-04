@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# Node / Remotion
+node_modules/
+remotion/out/
+
+# Secrets
+.env
+secrets/
+*.token.json
+*.enc
+
+# Generated content and caches (large binaries - not in git)
+content/
+backups/
+logs/
+models/
+voice_bakeoff/output/
+library/**/*.wav
+library/**/*.mp3
+library/**/*.mp4
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
