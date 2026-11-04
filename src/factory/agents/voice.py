@@ -40,7 +40,7 @@ DURATION_TOLERANCE = 0.10
 
 def voice_for(speaker: str, ctx: StageContext) -> tuple[str, float]:
     s = ctx.settings
-    if speaker == "needle":
+    if speaker == "lipa":
         return s.tts_companion_voice, s.tts_companion_speed
     return s.tts_hero_voice, s.tts_hero_speed
 
@@ -80,7 +80,7 @@ class VoiceStage(Stage):
         cdir = content_dir(ctx)
         lines_dir = ctx.workdir / "lines"
         cache_dir = Path(ctx.settings.library_dir) / "cache" / "tts"
-        hint = "Kai, Needle. " + ", ".join(sorted(load_lexicon()))
+        hint = "Arka, Lipa. " + ", ".join(sorted(load_lexicon()))
 
         out_lines: list[VoiceLine] = []
         preview: list[np.ndarray] = []

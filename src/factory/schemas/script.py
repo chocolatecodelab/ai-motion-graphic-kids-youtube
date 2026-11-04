@@ -6,9 +6,11 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from factory.schemas.characters import CharacterId
+
 Beat = Literal["hook", "mystery", "adventure", "discovery", "twist", "takeaway"]
 BEAT_ORDER: tuple[Beat, ...] = ("hook", "mystery", "adventure", "discovery", "twist", "takeaway")
-Speaker = Literal["kai", "needle"]
+Speaker = CharacterId
 Emotion = Literal["neutral", "curious", "excited", "surprised", "puzzled", "determined",
                   "delighted", "playful", "thoughtful"]
 

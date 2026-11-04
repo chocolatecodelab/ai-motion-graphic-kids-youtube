@@ -15,6 +15,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from factory.schemas.characters import CharacterId, Focus
 from factory.schemas.script import Beat
 
 ShotType = Literal["extreme_wide", "wide", "medium", "close_up", "extreme_close_up",
@@ -23,7 +24,6 @@ Angle = Literal["eye_level", "low", "high", "birds_eye", "tilted"]
 CameraMove = Literal["static", "zoom_in", "zoom_out", "dolly_in", "dolly_out", "pan_left",
                      "pan_right", "tilt_up", "tilt_down", "truck_left", "truck_right", "follow",
                      "whip_pan", "crane_up", "crane_down", "shake", "orbit"]
-Focus = Literal["kai", "needle", "both", "graphic", "background"]
 Depth = Literal["foreground", "midground", "background"]
 Motion = Literal["none", "walk", "run", "fly", "float", "jump", "shrink", "grow", "spin",
                  "bounce", "zip"]
@@ -43,7 +43,7 @@ class Waypoint(BaseModel):
 
 
 class Blocking(BaseModel):
-    character: Literal["kai", "needle"]
+    character: CharacterId
     x: float = Field(ge=-0.3, le=1.3, description="Horizontal position, 0..1 of the frame")
     y: float = Field(ge=0.0, le=1.3, description="Ground line, 0..1 of the frame (1 = bottom)")
     scale: float = Field(default=1.0, ge=0.1, le=4.0, description="1 = medium-shot size")

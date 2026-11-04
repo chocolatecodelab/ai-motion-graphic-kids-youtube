@@ -48,7 +48,7 @@ DURATION_TOLERANCE = 0.10
 
 def speed_for(speaker: str, ctx: StageContext) -> float:
     s = ctx.settings
-    return s.tts_companion_speed if speaker == "needle" else s.tts_hero_speed
+    return s.tts_companion_speed if speaker == "lipa" else s.tts_hero_speed
 
 
 def build_script(draft: ScriptDraft, slug: str, version: int, ctx: StageContext) -> Script:

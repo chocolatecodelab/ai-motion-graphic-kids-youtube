@@ -133,7 +133,7 @@ class QAStage(Stage):
         results += C.check_silence(scan, speech)
         results += C.check_loudness(video)
 
-        words = self.stt().transcribe_words(video, hint="Kai, Needle.")
+        words = self.stt().transcribe_words(video, hint="Arka, Lipa.")
         heard = " ".join(w for w, _, _ in words)
         results.append(C.check_speech(script_text, heard))
         srt = assembled.get("srt")

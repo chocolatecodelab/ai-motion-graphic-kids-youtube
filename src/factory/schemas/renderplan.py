@@ -9,6 +9,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from factory.schemas.characters import CharacterId
+
 Theme = Literal["attic", "workbench", "sunbeam", "sky", "air", "sunset", "mars", "space",
                 "studio"]
 
@@ -21,7 +23,7 @@ class PlanWaypoint(BaseModel):
 
 
 class PlanBlocking(BaseModel):
-    character: Literal["kai", "needle"]
+    character: CharacterId
     x: float
     y: float
     scale: float
@@ -56,12 +58,27 @@ class PlanGraphic(BaseModel):
 
 class PlanLine(BaseModel):
     line_id: str
-    speaker: Literal["kai", "needle"]
+    speaker: CharacterId
     text: str
     emotion: str
     start_frame: int
     end_frame: int
     mouth: list[float]
+
+
+class PlanWord(BaseModel):
+    text: str
+    start_frame: int
+    end_frame: int
+
+
+class PlanCaption(BaseModel):
+    """One on-screen caption chunk (owner decision D7), scene-relative frames."""
+
+    speaker: CharacterId
+    start_frame: int
+    end_frame: int
+    lines: list[list[PlanWord]] = Field(min_length=1, max_length=2)
 
 
 class PlanTransition(BaseModel):
@@ -78,6 +95,7 @@ class PlanScene(BaseModel):
     shots: list[PlanShot]
     graphics: list[PlanGraphic]
     lines: list[PlanLine]
+    captions: list[PlanCaption] = Field(default_factory=list)
     transition_in: PlanTransition
     transition_out: PlanTransition
 

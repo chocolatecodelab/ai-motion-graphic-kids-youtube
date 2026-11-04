@@ -1,0 +1,17 @@
+# Rig contract v2 (Character Bible v2, docs/creative/CHARACTER_BIBLE.md): Arka & Lipa.
+# The storyboard may only use these IDs. Older rig v1 storyboards (kai/needle) still render:
+# schemas map kai -> arka and needle -> lipa, and the renderer maps the old pose and expression IDs.
+version: rig.v2
+characters:
+  arka:
+    display_name: Arka
+    role: hero
+    poses: [idle, talk, point, think, surprised, celebrate, walk, hold_map, hold_compass, look_out, crouch, wave, jump, look_up]
+    expressions: [neutral, curious, surprised, delighted, puzzled, determined, worried, laughing, wink, awe]
+    actions: [wave, nod, jump, gasp, look_around, tap_compass, shrug, scratch_head]
+  lipa:
+    display_name: Lipa
+    role: companion
+    poses: [float, flap, glide, dive, perch, loop]
+    expressions: [neutral, curious, surprised, delighted, puzzled, determined, worried, laughing]
+    actions: [sparkle, loop_the_loop, dim, flash, wiggle]

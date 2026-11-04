@@ -2,12 +2,14 @@
 import React from "react";
 import { AbsoluteFill, useCurrentFrame, useVideoConfig } from "remotion";
 import { C } from "../brand";
-import { Kai } from "../characters/Kai";
-import { Needle } from "../characters/Needle";
 import { GraphicView } from "../graphics/Graphics";
+import { Arka } from "../rig/Arka";
+import { Lipa } from "../rig/lipa";
 import type { PlanGraphic, PlanScene, PlanShot, SceneProps } from "../types";
 import { BackgroundLayer, LAYER_PARALLAX, type Layer } from "./Backgrounds";
+import { Captions } from "./Captions";
 import { actorAt, ActorState, cameraAt, CameraState, DEPTH_PARALLAX, H, W } from "./layout";
+import { arkaFaceAt, arkaOverlap, arkaPoseAt, type ArkaCtx, blinkAt, lipaStateAt } from "./puppets";
 import { SceneTransitions, transitionCameraBoost } from "./Transitions";
 
 const shotAt = (scene: PlanScene, f: number): PlanShot =>
@@ -21,24 +23,59 @@ const worldTransform = (cam: CameraState, k: number, boost: { zoom: number; dx: 
   return `translate(${W / 2 + boost.dx}px, ${H / 2}px) rotate(${cam.rotate}deg) scale(${zoom}) translate(${-cx}px, ${-cy}px)`;
 };
 
-const Actor: React.FC<{ a: ActorState; pose: string; expression: string; action: string | null; mouth: number; talking: boolean; t: number; frame: number }> = ({
-  a, pose, expression, action, mouth, talking, t, frame,
-}) => {
-  const isKai = a.character === "kai";
-  const w = isKai ? a.height / 2 : a.height;
-  const blink = (frame + (isKai ? 0 : 41)) % 97 < 4;
-  const props = { pose, expression, action, mouth, blink, t, walkPhase: a.walkPhase, talking };
+// Rig spaces (Character Bible v2): Arka's feet sit at (0,0) and his hat top near y = -410;
+// Lipa is drawn around her body centre and is about 140 units across.
+const ARKA_UNITS = 410;
+const ARKA_VB = { x: -150, y: -440, w: 300, h: 460 };
+const LIPA_UNITS = 140;
+const LIPA_VB = 130; // half-size of Lipa's square viewBox
+
+const Portal: React.FC<{ strength: number; width: number }> = ({ strength, width }) =>
+  strength > 0 ? (
+    <div style={{ position: "absolute", left: "50%", bottom: 0, width: width * 1.6, height: width * 0.5,
+      translate: "-50% 50%", borderRadius: "50%", border: `10px solid ${C.teal}`, opacity: strength, boxShadow: `0 0 30px ${C.teal}` }} />
+  ) : null;
+
+const Actor: React.FC<{ a: ActorState; ctx: ArkaCtx; t: number; frame: number; mouth: number }> = ({ a, ctx, t, frame, mouth }) => {
+  const secs = frame / ctx.fps;
+  const facing = a.scaleX < 0 ? -1 : 1;
+  const uid = `${a.character}-${ctx.seed}`;
+  if (a.character === "arka") {
+    const ppu = a.height / ARKA_UNITS;
+    const w = ARKA_VB.w * ppu;
+    const h = ARKA_VB.h * ppu;
+    const body = arkaPoseAt(ctx, t);
+    // Facing camera = a near-frontal head; otherwise the default 3/4 view.
+    const pose = ctx.b.facing === "camera" ? { ...body, turn: Math.max(-1, Math.min(1, body.turn - 0.75)) } : body;
+    return (
+      <div style={{
+        position: "absolute", left: a.x + ARKA_VB.x * ppu, top: a.y + ARKA_VB.y * ppu, width: w, height: h,
+        opacity: a.opacity, transformOrigin: `50% ${((-ARKA_VB.y / ARKA_VB.h) * 100).toFixed(2)}%`,
+        transform: `rotate(${a.rotate}deg) scaleY(${a.squash})`,
+      }}>
+        <div style={{ position: "absolute", left: 0, top: 0, width: w, height: -ARKA_VB.y * ppu }}>
+          <Portal strength={a.portal} width={w * 0.6} />
+        </div>
+        <svg viewBox={`${ARKA_VB.x} ${ARKA_VB.y} ${ARKA_VB.w} ${ARKA_VB.h}`} width={w} height={h} style={{ overflow: "visible" }}>
+          <Arka pose={pose} expression={arkaFaceAt(ctx, t, mouth)} t={secs + ctx.seed * 0.11} blink={blinkAt(frame, ctx.seed)}
+            facing={facing} uid={uid} overlap={arkaOverlap(ctx, t)} />
+        </svg>
+      </div>
+    );
+  }
+  const ppu = a.height / LIPA_UNITS;
+  const size = LIPA_VB * 2 * ppu;
+  const lipa = lipaStateAt(ctx, t, mouth);
   return (
     <div style={{
-      position: "absolute", left: a.x - w / 2, top: a.y - a.height, width: w, height: a.height,
-      opacity: a.opacity, transformOrigin: "50% 100%",
-      transform: `rotate(${a.rotate}deg) scale(${a.scaleX}, ${a.squash})`,
+      position: "absolute", left: a.x - size / 2, top: a.y - a.height / 2 - size / 2, width: size, height: size,
+      opacity: a.opacity, transformOrigin: "50% 50%", transform: `rotate(${a.rotate}deg) scaleY(${a.squash})`,
     }}>
-      {a.portal > 0 && (
-        <div style={{ position: "absolute", left: "50%", bottom: 0, width: w * 1.6, height: w * 0.5,
-          translate: "-50% 50%", borderRadius: "50%", border: `10px solid ${C.teal}`, opacity: a.portal, boxShadow: `0 0 30px ${C.teal}` }} />
-      )}
-      {isKai ? <Kai {...props} /> : <Needle {...props} />}
+      <Portal strength={a.portal} width={a.height} />
+      <svg viewBox={`${-LIPA_VB} ${-LIPA_VB} ${LIPA_VB * 2} ${LIPA_VB * 2}`} width={size} height={size} style={{ overflow: "visible" }}>
+        <Lipa pose={lipa.pose} expression={lipa.expression} t={secs + ctx.seed * 0.07} facing={facing} uid={uid}
+          flapTip={lipa.flapTip} bob={lipa.bob} />
+      </svg>
     </div>
   );
 };
@@ -74,7 +111,9 @@ export const Scene: React.FC<SceneProps> = ({ scene }) => {
   const t = frame - shot.start_frame;
   const len = shot.end_frame - shot.start_frame;
 
-  const actors = shot.blocking.map((b, i) => actorAt(b, t, len, i * 17 + scene.scene_id.length));
+  const seedOf = (i: number) => i * 17 + scene.scene_id.length;
+  const actors = shot.blocking.map((b, i) => actorAt(b, t, len, seedOf(i)));
+  const prevShot = scene.shots[scene.shots.indexOf(shot) - 1];
   // Camera framing reference: where characters stand (start and end of their paths),
   // ignoring entrances/exits and motion wobble, so a static camera frames the action.
   const rest = (b: PlanShot["blocking"][number]) => ({ ...b, enter: "none" as const, exit: "none" as const, motion: "none" as const });
@@ -102,8 +141,11 @@ export const Scene: React.FC<SceneProps> = ({ scene }) => {
   const byDepth = (depth: "background" | "midground" | "foreground") => (
     <AbsoluteFill style={{ transform: worldTransform(cam, DEPTH_PARALLAX[depth], boost), transformOrigin: "0 0" }}>
       {shot.blocking.map((b, i) => b.depth === depth && (
-        <Actor key={b.character} a={actors[i]} pose={b.pose} expression={b.expression} action={b.action}
-          mouth={mouthFor(b.character)} talking={speaking?.speaker === b.character} t={t} frame={frame} />
+        <Actor key={b.character} a={actors[i]} t={t} frame={frame} mouth={mouthFor(b.character)}
+          ctx={{
+            b, len, fps, seed: seedOf(i), talking: speaking?.speaker === b.character,
+            prev: prevShot?.blocking.find((p) => p.character === b.character),
+          }} />
       ))}
     </AbsoluteFill>
   );
@@ -120,6 +162,7 @@ export const Scene: React.FC<SceneProps> = ({ scene }) => {
         <GraphicLayer key={i} g={g} frame={frame} fps={fps} index={i} side={graphicSide}
           focus={shot.focus === "graphic" || shot.shot_type === "insert"} />
       ))}
+      <Captions captions={scene.captions ?? []} frame={frame} />
       <SceneTransitions frame={frame} duration={scene.duration_frames} tin={scene.transition_in} tout={scene.transition_out} />
     </AbsoluteFill>
   );

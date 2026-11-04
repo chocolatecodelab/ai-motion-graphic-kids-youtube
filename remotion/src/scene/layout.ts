@@ -10,7 +10,7 @@ const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 const ease = Easing.bezier(0.45, 0, 0.25, 1);
 
 // Character height in world pixels at blocking.scale = 1 (a medium figure in a wide frame).
-export const BASE_HEIGHT: Record<CharacterId, number> = { kai: 0.62 * H, needle: 0.16 * H };
+export const BASE_HEIGHT: Record<CharacterId, number> = { arka: 0.62 * H, lipa: 0.24 * H } // Lipa ~1/4 of Arka at blocking scale 0.6;
 const DEPTH_SCALE = { background: 0.72, midground: 1, foreground: 1.22 } as const;
 export const DEPTH_PARALLAX = { background: 0.75, midground: 1, foreground: 1.25 } as const;
 
@@ -50,15 +50,18 @@ export const actorAt = (b: PlanBlocking, t: number, shotLen: number, seed: numbe
   let portal = 0;
   const progress = shotLen > 1 ? t / (shotLen - 1) : 0;
 
-  switch (b.motion) {
-    case "walk": walkPhase = (t / 18) % 1; y -= Math.abs(Math.sin((t / 18) * Math.PI * 2)) * 10; break;
-    case "run": walkPhase = (t / 10) % 1; y -= Math.abs(Math.sin((t / 10) * Math.PI * 2)) * 18; rotate = 7; break;
+  // Arka's walk / run / jump / bounce are animated inside the rig (smooth gait, anticipation,
+  // landing squash: see scene/puppets.ts), so layout only moves his anchor along the path.
+  const rigDriven = b.character === "arka" && ["walk", "run", "jump", "bounce"].includes(b.motion);
+  switch (rigDriven ? "none" : b.motion) {
+    case "walk": walkPhase = (t / 18) % 1; y -= Math.sin((t / 18) * Math.PI * 2) ** 2 * 10; break;
+    case "run": walkPhase = (t / 10) % 1; y -= Math.sin((t / 10) * Math.PI * 2) ** 2 * 18; rotate = 7; break;
     case "fly": y -= 18 + Math.sin((t + seed) / 7) * 16; rotate = 9; break;
     case "float": y -= Math.sin((t + seed) / 9) * 12; break;
     case "jump": {
       const c = (t % 26) / 26;
       y -= Math.sin(c * Math.PI) * 90;
-      squash = c < 0.08 || c > 0.92 ? 0.9 : 1.03;
+      squash = 1.03 - 0.13 * Math.cos(c * Math.PI) ** 8; // squash at take-off/landing, eased
       break;
     }
     case "shrink": scale *= interpolate(progress, [0, 1], [1, 0.35], { ...clamp, easing: ease }); break;
@@ -106,12 +109,17 @@ const TARGET: Record<string, number> = {
   over_shoulder: 0.95, pov: 0.7, insert: 0.6,
 };
 
+// Arka's big head means a close-up needs far less zoom than a realistic figure would.
+const ARKA_TARGET: Record<string, number> = { medium: 1.0, close_up: 1.4, extreme_close_up: 2.3, over_shoulder: 0.9 };
+
 export interface CameraState { zoom: number; cx: number; cy: number; rotate: number }
 
 const headPoint = (a: ActorState, shotType: string) => {
   // Close shots frame the face; wider shots frame the body centre.
-  const k = a.character === "needle" ? 0.5
-    : shotType === "close_up" || shotType === "extreme_close_up" ? 0.74 : shotType === "medium" ? 0.64 : 0.5;
+  // Arka is chibi-proportioned (head + hat = top half of the figure): eyes sit at about 0.62 of
+  // his height, the head-and-shoulders block centres near 0.72.
+  const k = a.character === "lipa" ? 0.5
+    : shotType === "extreme_close_up" ? 0.62 : shotType === "close_up" ? 0.72 : shotType === "medium" ? 0.62 : 0.5;
   return { x: a.x, y: a.y - a.height * k };
 };
 
@@ -122,7 +130,7 @@ export const cameraAt = (shot: PlanShot, t: number, actorsNow: ActorState[], act
   const actors = tracking ? actorsNow : actorsStart;
 
   const focusIds: CharacterId[] =
-    shot.focus === "kai" || shot.focus === "needle" ? [shot.focus] : ["kai", "needle"];
+    shot.focus === "arka" || shot.focus === "lipa" ? [shot.focus] : ["arka", "lipa"];
   const focused = actors.filter((a) => focusIds.includes(a.character));
   const subjects = focused.length ? focused : actors;
 
@@ -132,10 +140,10 @@ export const cameraAt = (shot: PlanShot, t: number, actorsNow: ActorState[], act
   if (shot.focus === "graphic" || shot.focus === "background" || subjects.length === 0) {
     zoom = shot.shot_type === "extreme_wide" ? 0.85 : 1;
   } else {
-    const target = TARGET[shot.shot_type] ?? 0.55;
-    const kai = subjects.find((a) => a.character === "kai");
-    const ref = kai ?? subjects[0];
-    const refHeight = ref.character === "needle" ? ref.height * 3.2 : ref.height; // Needle is tiny
+    const hero = subjects.find((a) => a.character === "arka");
+    const ref = hero ?? subjects[0];
+    const target = (hero ? ARKA_TARGET[shot.shot_type] : undefined) ?? TARGET[shot.shot_type] ?? 0.55;
+    const refHeight = ref.character === "lipa" ? ref.height * 4.2 : ref.height; // Lipa is small
     zoom = (target * H) / Math.max(refHeight, 1);
     const pts = subjects.map((a) => headPoint(a, shot.shot_type));
     cx = pts.reduce((s, q) => s + q.x, 0) / pts.length;

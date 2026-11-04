@@ -19,20 +19,23 @@ from typing import Any
 import numpy as np
 
 from factory.agents.common import content_dir, load_upstream, save
-from factory.agents.subtitles import to_srt, to_vtt
+from factory.agents.subtitles import timed_words, to_srt, to_vtt
 from factory.artifacts import write_text
+from factory.captions import chunk_line
 from factory.db.models import Lane
 from factory.media import audio as A
 from factory.pipeline import PermanentStageError, Stage, StageContext, StageResult
 from factory.schemas.renderplan import (
     AudioCue,
     PlanBlocking,
+    PlanCaption,
     PlanGraphic,
     PlanLine,
     PlanScene,
     PlanShot,
     PlanTransition,
     PlanWaypoint,
+    PlanWord,
     RenderPlan,
 )
 from factory.schemas.storyboard import Storyboard, StoryboardScene
@@ -94,6 +97,7 @@ def build_scene(scene: StoryboardScene, voice: dict[str, Any], tin: PlanTransiti
                 tout: PlanTransition, cdir: Path) -> tuple[PlanScene, dict[str, int]]:
     t = max(LEAD_IN_S, tin.frames / FPS + 0.15)
     lines: list[PlanLine] = []
+    captions: list[PlanCaption] = []
     starts: dict[str, int] = {}
     for lid in scene.line_ids:
         v = voice.get(lid)
@@ -104,6 +108,14 @@ def build_scene(scene: StoryboardScene, voice: dict[str, Any], tin: PlanTransiti
         lines.append(PlanLine(line_id=lid, speaker=v.speaker, text=v.text, emotion="neutral",
                               start_frame=start, end_frame=start + frames,
                               mouth=mouth_curve(cdir / v.file, frames)))
+        words = []
+        for text, a, b in timed_words(v):  # script words, preview-timeline seconds
+            s0 = start + _frames((a - v.preview_start_s) * FPS)
+            s1 = start + _frames((b - v.preview_start_s) * FPS)
+            s0 = min(max(s0, start), start + frames - 1)
+            words.append(PlanWord(text=text, start_frame=s0,
+                                  end_frame=min(max(s1, s0 + 1), start + frames)))
+        captions += chunk_line(v.speaker, words)
         starts[lid] = start
         t += v.duration_s + GAP_S
     speech_end = t - GAP_S
@@ -152,7 +164,8 @@ def build_scene(scene: StoryboardScene, voice: dict[str, Any], tin: PlanTransiti
         theme=scene.background.theme or theme_for(
             scene.background.asset_request or scene.background.library_id or ""),
         background_description=scene.background.asset_request or "",
-        shots=shots, graphics=graphics, lines=lines, transition_in=tin, transition_out=tout)
+        shots=shots, graphics=graphics, lines=lines, captions=captions,
+        transition_in=tin, transition_out=tout)
     return plan, starts
 
 
@@ -177,7 +190,7 @@ def transitions(board: Storyboard) -> list[tuple[PlanTransition, PlanTransition]
 class TimingStage(Stage):
     name = "timing"
     lane = Lane.MEDIA
-    version = "1"
+    version = "2"  # v2: word timings + on-screen caption chunks (D7)
     depends_on = ("storyboard", "voice", "subtitles")
     max_attempts = 1
 

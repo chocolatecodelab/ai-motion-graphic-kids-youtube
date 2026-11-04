@@ -102,6 +102,15 @@ def test_timing_builds_frame_accurate_plan(tmp_path: Path, chain: dict) -> None:
     assert plan.scenes[2].transition_out.type == "compass_portal"  # from the storyboard
     assert plan.scenes[3].transition_in.type == "compass_portal"
     assert len(plan.audio) == 14
+    # On-screen captions (D7) spell exactly the script, in order.
+    script = Script.model_validate_json(
+        (tmp_path / "content" / chain["script"]["path"]).read_text(encoding="utf-8"))
+    on_screen = " ".join(w.text for s in plan.scenes for c in s.captions
+                         for line in c.lines for w in line)
+    assert on_screen == " ".join(ln.text for ln in script.lines)
+    for s in plan.scenes:
+        for c in s.captions:
+            assert 0 <= c.start_frame < c.end_frame <= s.duration_frames
     srt = (tmp_path / "content" / out["srt"]).read_text(encoding="utf-8")
     assert srt.startswith("1\n")
 

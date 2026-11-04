@@ -57,9 +57,9 @@ class Settings(BaseSettings):
 
     # Voices chosen by the owner in the 2026-11-04 bake-off (DECISIONS.md).
     tts_provider: str = "kokoro"
-    tts_hero_voice: str = "af_heart"      # Kai
+    tts_hero_voice: str = "af_heart"      # Arka
     tts_hero_speed: float = Field(default=1.0, gt=0.5, lt=2.0)
-    tts_companion_voice: str = "af_sky"   # Needle
+    tts_companion_voice: str = "af_sky"   # Lipa
     tts_companion_speed: float = Field(default=1.1, gt=0.5, lt=2.0)
 
     # --- budgets (USD; soft = notify, hard = pause queue). Marginal cost is ~$0 on the

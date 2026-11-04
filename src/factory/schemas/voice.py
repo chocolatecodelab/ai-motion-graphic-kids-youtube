@@ -6,6 +6,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from factory.schemas.characters import CharacterId
+
 
 class Word(BaseModel):
     text: str
@@ -15,7 +17,7 @@ class Word(BaseModel):
 
 class VoiceLine(BaseModel):
     line_id: str
-    speaker: Literal["kai", "needle"]
+    speaker: CharacterId
     text: str
     voice: str
     speed: float

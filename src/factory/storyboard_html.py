@@ -19,7 +19,7 @@ BEAT_COLORS = {  # brand palette
     "hook": "#243B75", "mystery": "#3B6E8F", "adventure": "#55BBA5",
     "discovery": "#2F8F7A", "twist": "#F47C45", "takeaway": "#E0A928",
 }
-SPEAKER_COLORS = {"kai": "#55BBA5", "needle": "#F8C84A"}
+SPEAKER_COLORS = {"arka": "#2E9E7F", "lipa": "#FFD872"}
 CAMERA_ICONS = {"static": "■", "push_in": "⤢ in", "pull_out": "⤡ out", "pan": "⇄",
                 "parallax": "≋", "orbit": "↻"}
 

@@ -17,7 +17,8 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 PROMPTS = ROOT / "prompts"
 CATALOGUE = ROOT / "config" / "catalogue"
-SHARED_CONTEXT = ("brand_story.md", "kids_safety.md", "characters_v0.md")
+RIG_FILE = "rig_v2.yaml"
+SHARED_CONTEXT = ("brand_story.md", "kids_safety.md", "characters_v1.md")
 
 
 def sha256_text(text: str) -> str:
@@ -69,7 +70,7 @@ class Components:
 
 @lru_cache(maxsize=1)
 def rig() -> Rig:
-    data = yaml.safe_load((CATALOGUE / "rig_v0.yaml").read_text(encoding="utf-8"))
+    data = yaml.safe_load((CATALOGUE / RIG_FILE).read_text(encoding="utf-8"))
     return Rig(data["version"], data["characters"])
 
 
@@ -82,6 +83,6 @@ def components() -> Components:
 def resource_hash(*names: str) -> str:
     """Hash of prompt templates + shared context + catalogues used by a stage."""
     blob = "\n".join(prompt(n) for n in names) + shared_context()
-    blob += (CATALOGUE / "rig_v0.yaml").read_text(encoding="utf-8")
+    blob += (CATALOGUE / RIG_FILE).read_text(encoding="utf-8")
     blob += (CATALOGUE / "components.yaml").read_text(encoding="utf-8")
     return sha256_text(blob)

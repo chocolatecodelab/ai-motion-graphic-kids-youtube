@@ -98,6 +98,27 @@ The owner approved the pilot storyboard (v2) to continue, with two requirements 
    - **character blocking:** free x/y position, scale and depth (foreground/midground/background), facing direction, entrances and exits, and movement paths during the scene (walk, run, fly, float, shrink or grow), timed to lines;
    - **a variety rule** checked in code: no more than two consecutive scenes with the same shot type and blocking, and every adventure scene must include movement.
 
+## 2026-11-05: M2 owner decisions
+
+| # | Topic | Decision |
+|---|---|---|
+| D7 | Subtitles | **Both.** SRT/VTT files for YouTube CC, plus kid-friendly **on-screen captions** burned into the video: big rounded font, the current word highlighted, a speaker colour cue, kept clear of faces. The on-screen text always matches the script word for word |
+| D8 | Final character design | **Designed in SVG by Claude** (no image API, free-first D2): Character Bible v1, turnaround/pose/expression reference sheet rendered from the real rig. **Owner reviews the sheet before `character_version = 1` is locked** |
+
+## 2026-11-05: Characters replaced: Arka & Lipa (supersedes Kai & Needle)
+
+The owner supplied a new character design and its React/SVG rig (`arka-lipa-character-bible.svg`, `arka-lipa-remotion.zip`). The owner asked for the characters only: voices and everything else stay as they are.
+
+| Topic | Decision |
+|---|---|
+| Hero | **Arka** (speaker id `arka`), a young explorer: safari hat with a compass pin, teal kawung scarf, backpack with bedroll |
+| Companion | **Lipa** (speaker id `lipa`), an origami bird folded from an old expedition map that glows when it finds a trail |
+| Voices | Unchanged: Arka = Kokoro `af_heart` 1.0, Lipa = `af_sky` 1.1 (the former Kai/Needle voices) |
+| Rig | The owner's rig is ported into `remotion/src/rig/` and polished by Claude (Character Bible v2, "Motion"): soft elbows and knees, a smooth eased walk cycle, a tidier crouch, prop grow/shrink during blends, head follow-through, jump anticipation, idle weight shift, and Lipa's asymmetric wingbeat with flexing wing tips |
+| Contract | Rig catalogue `rig.v2` (`config/catalogue/rig_v2.yaml`). Old artifacts that use `kai`/`needle` and old pose/expression IDs still load and render through aliases |
+| Review | Reference sheet `docs/creative/reference_sheet_v2.png` and motion check `docs/creative/rig_v2_motion_check.mp4`. **Approved by the owner on 2026-11-05: `character_version = 2` is locked** |
+| Pilot | The pilot's approved script and audio still say "Kai"/"Needle". Re-voicing it with the new names needs a new script approval |
+
 ## 2026-11-04: First full render of the pilot (measured on the owner's laptop)
 
 | Step | Result |

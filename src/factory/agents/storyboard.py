@@ -195,12 +195,12 @@ def check_variety(draft: StoryboardDraft) -> list[str]:
         if s.beat == "adventure" and not any(_moves(sh) for sh in s.shots):
             issues.append(f"{s.scene_id} is an adventure scene with no movement.")
     parked = 0
-    for _, sh in shots:  # Kai left + Needle right, again and again
+    for _, sh in shots:  # Arka left + Lipa right, again and again
         pos = {b.character: b.x for b in sh.blocking}
-        if pos.get("kai", 0.5) < 0.38 and pos.get("needle", 0.5) > 0.62:
+        if pos.get("arka", 0.5) < 0.38 and pos.get("lipa", 0.5) > 0.62:
             parked += 1
     if parked > len(shots) * 0.4:
-        issues.append(f"Kai is parked left and Needle right in {parked}/{len(shots)} shots; "
+        issues.append(f"Arka is parked left and Lipa right in {parked}/{len(shots)} shots; "
                       f"vary their positions, depth and scale.")
     return issues
 

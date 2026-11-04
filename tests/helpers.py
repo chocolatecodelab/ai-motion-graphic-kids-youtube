@@ -31,32 +31,32 @@ def L(speaker: str, text: str, claims: list[str] | None = None,  # noqa: N802
 
 def good_draft() -> dict[str, Any]:
     scenes = [
-        ("hook", "Kai's attic", [
-            L("kai", "Why is the sky blue, and not green or purple?"),
-            L("needle", "Ooh! I want to know too!", emotion="excited"),
+        ("hook", "Arka's attic", [
+            L("arka", "Why is the sky blue, and not green or purple?"),
+            L("lipa", "Ooh! I want to know too!", emotion="excited"),
         ]),
         ("mystery", "Attic window", [
-            L("kai", "Sunlight looks white, but it hides every color of the rainbow.", ["C01"]),
-            L("needle", "So where do the other colors go?", emotion="puzzled"),
+            L("arka", "Sunlight looks white, but it hides every color of the rainbow.", ["C01"]),
+            L("lipa", "So where do the other colors go?", emotion="puzzled"),
         ]),
         ("adventure", "Inside a sunbeam", [
-            L("kai", "Okay, Needle, show me the inside!", emotion="determined"),
-            L("needle", "Shrinking us down now. Hold on to your hoodie!", emotion="playful"),
-            L("kai", "Light moves in waves. Each color has its own size of wave.", ["C02"]),
+            L("arka", "Okay, Lipa, show me the inside!", emotion="determined"),
+            L("lipa", "Shrinking us down now. Hold on to your hat!", emotion="playful"),
+            L("arka", "Light moves in waves. Each color has its own size of wave.", ["C02"]),
         ]),
         ("discovery", "High in the air", [
-            L("kai", "Blue waves are short. Red waves are long.", ["C03"]),
-            L("kai", "Tiny air bits bounce blue light all over the sky.", ["C04", "C05"]),
-            L("needle", "Boing, boing, boing! Blue everywhere!", emotion="delighted"),
+            L("arka", "Blue waves are short. Red waves are long.", ["C03"]),
+            L("arka", "Tiny air bits bounce blue light all over the sky.", ["C04", "C05"]),
+            L("lipa", "Boing, boing, boing! Blue everywhere!", emotion="delighted"),
         ]),
         ("twist", "A hologram of Mars", [
-            L("kai", "On Mars, the daytime sky looks orange instead.", ["C08"],
+            L("arka", "On Mars, the daytime sky looks orange instead.", ["C08"],
               emotion="surprised"),
         ]),
         ("takeaway", "Back in the attic", [
-            L("kai", "Blue bounces the most, so our sky looks blue.", ["C05"]),
-            L("needle", "Mystery solved!", emotion="delighted"),
-            L("kai", "Almost! Next time, let's chase a sunset.", emotion="playful"),
+            L("arka", "Blue bounces the most, so our sky looks blue.", ["C05"]),
+            L("lipa", "Mystery solved!", emotion="delighted"),
+            L("arka", "Almost! Next time, let's chase a sunset.", emotion="playful"),
         ]),
     ]
     return {
@@ -83,7 +83,7 @@ def pass_review() -> dict[str, Any]:
     }
 
 
-SHOT_CYCLE = [  # (type, angle, camera move, kai x, needle x, kai motion)
+SHOT_CYCLE = [  # (type, angle, camera move, arka x, lipa x, arka motion)
     ("wide", "eye_level", "dolly_in", 0.45, 0.62, "walk"),
     ("medium", "low", "zoom_in", 0.55, 0.40, "none"),
     ("close_up", "high", "static", 0.50, 0.70, "none"),
@@ -99,10 +99,10 @@ def storyboard_for(script: Any, pad: float = 1.0) -> dict[str, Any]:
         lines = [ln for ln in script.lines if ln.scene_key == scene.key]
         speakers = {ln.speaker for ln in lines}
         shot_type, angle, move, kx, nx, kmotion = SHOT_CYCLE[i % len(SHOT_CYCLE)]
-        blocking = [{"character": "kai", "x": kx, "y": 0.9, "scale": 1.0, "pose": "talk",
+        blocking = [{"character": "arka", "x": kx, "y": 0.9, "scale": 1.0, "pose": "talk",
                      "expression": "curious", "motion": kmotion}]
-        if "needle" in speakers:
-            blocking.append({"character": "needle", "x": nx, "y": 0.5, "scale": 0.6,
+        if "lipa" in speakers:
+            blocking.append({"character": "lipa", "x": nx, "y": 0.5, "scale": 0.6,
                              "depth": "foreground", "pose": "float",
                              "expression": "delighted", "motion": "zip",
                              "path": [{"x": nx + 0.1, "y": 0.4, "scale": 0.6}]})

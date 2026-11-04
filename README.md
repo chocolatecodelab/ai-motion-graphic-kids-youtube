@@ -4,15 +4,20 @@
 
 **Status:** Phase 0 (research & design) is complete. M1 is in progress. Done so far:
 - foundations: config, DB schema + migrations, logging, `factory doctor`, tests;
-- voice bake-off: Kai = Kokoro `af_heart`, Needle = `af_sky`;
+- voice bake-off: hero (now Arka) = Kokoro `af_heart`, companion (now Lipa) = `af_sky`;
 - job queue, worker and the `claude -p` LLM provider;
 - the brief → script → script review (owner approval) → storyboard stages;
 - voice (Kokoro per line, STT/WER check, line cache) and subtitles (SRT/VTT);
 - storyboard v2 (shot types, angles, camera moves, character blocking + variety rules);
-- Remotion renderer (`remotion/`, v4.0.538): placeholder vector puppets for Kai & Needle,
+- Remotion renderer (`remotion/`, v4.0.538): vector character rigs,
   9 parallax background themes, motion-graphics components, transitions;
 - timing (frame-accurate render plan, lip-flap curves) → render_scenes (cached scene clips) →
   assemble (episode MP4, -14 LUFS) → qa (technical QA report, blocks on critical defects).
+
+**M2 in progress:**
+- on-screen captions (current word highlighted, speaker colour) next to the SRT/VTT files;
+- Character Bible v2 ([docs/creative/CHARACTER_BIBLE.md](docs/creative/CHARACTER_BIBLE.md)): **Arka & Lipa** replace Kai & Needle. The owner's React/SVG rig (`remotion/src/rig/`, rig.v2: Arka 14 poses × 10 expressions, Lipa 6 poses × 8 expressions) has been polished for smooth motion: soft joints, an eased walk, pose blending, prop fades, follow-through, and paper-wing flight;
+- reference sheet [docs/creative/reference_sheet_v2.png](docs/creative/reference_sheet_v2.png) and motion check [docs/creative/rig_v2_motion_check.mp4](docs/creative/rig_v2_motion_check.mp4), approved by the owner (`character_version = 2`). Rebuild them in `remotion/` with `npx remotion still CharacterSheet` and `npx remotion render RigCheck`.
 
 **M1 exit criteria met:** `uv run factory run-episode` takes the pilot brief to a QA-passed 1080p MP4. It stops once, for the owner's script approval; continue with `--episode <slug>`.
 

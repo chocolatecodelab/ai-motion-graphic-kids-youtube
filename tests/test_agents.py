@@ -86,12 +86,12 @@ def test_good_script_passes_checks() -> None:
     ("mutate", "expect"),
     [
         (lambda d: d["scenes"][0]["lines"].insert(0, {
-            "speaker": "kai", "text": "Hey guys, let's dive in!", "emotion": "excited",
+            "speaker": "arka", "text": "Hey guys, let's dive in!", "emotion": "excited",
             "claim_ids": [], "direction": ""}), "banned phrasing"),
         (lambda d: d["scenes"][1]["lines"][0].update(claim_ids=["C99"]), "unknown or unverified"),
         (lambda d: d["scenes"].reverse(), "Beats must follow"),
         (lambda d: d["scenes"][0]["lines"].insert(0, {
-            "speaker": "kai", "text": " ".join(["word"] * 45) + ".", "emotion": "neutral",
+            "speaker": "arka", "text": " ".join(["word"] * 45) + ".", "emotion": "neutral",
             "claim_ids": [], "direction": ""}), "central question"),
         (lambda d: [s["lines"].extend(s["lines"] * 6) for s in d["scenes"]], "spoken length"),
         (lambda d: d["scenes"][3]["lines"][0].update(
@@ -264,7 +264,7 @@ def test_numbers_allowed_when_illustrative_or_sourced() -> None:
         (lambda b: [s["shots"][0].update(camera_move="static")
                     or [bl.update(motion="none", path=[]) for bl in s["shots"][0]["blocking"]]
                     for s in b["scenes"]], "adventure scene with no movement"),
-        (lambda b: [[bl.update(x=0.2 if bl["character"] == "kai" else 0.8)
+        (lambda b: [[bl.update(x=0.2 if bl["character"] == "arka" else 0.8)
                      for bl in s["shots"][0]["blocking"]] for s in b["scenes"]],
          "parked left"),
         (lambda b: b["scenes"][1]["shots"].append(

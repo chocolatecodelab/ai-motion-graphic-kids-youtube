@@ -1,0 +1,16 @@
+# Rig contract v1 (Character Bible v1, docs/creative/CHARACTER_BIBLE.md). The storyboard may only use these IDs.
+# v0 IDs are a subset of v1, so v0 storyboards stay valid.
+version: rig.v1
+characters:
+  kai:
+    display_name: Kai
+    role: hero
+    poses: [idle, talk, point, think, surprised, celebrate, walk, hold_compass, crouch, look_up]
+    expressions: [neutral, curious, surprised, delighted, puzzled, determined, worried_lite, laughing]
+    actions: [wave, nod, jump, gasp, look_around, tap_compass, shrug, scratch_head]
+  needle:
+    display_name: Needle
+    role: companion
+    poses: [float, zip, glow, spin, peek, bounce]
+    expressions: [neutral, curious, surprised, delighted, puzzled, determined, worried_lite, laughing]
+    actions: [sparkle, loop_the_loop, dim, flash, wiggle]

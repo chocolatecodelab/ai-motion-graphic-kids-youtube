@@ -1,7 +1,7 @@
 // renderplan.v1: one scene of the frame-accurate render plan produced by the Python
 // `timing` stage (src/factory/schemas/renderplan.py). Keep the two in sync.
 
-export type CharacterId = "kai" | "needle";
+export type CharacterId = "arka" | "lipa";
 export type ShotType =
   | "extreme_wide" | "wide" | "medium" | "close_up" | "extreme_close_up"
   | "over_shoulder" | "pov" | "insert";
@@ -33,7 +33,7 @@ export interface PlanBlocking {
 export interface PlanShot {
   start_frame: number; end_frame: number; // scene-relative, end exclusive
   shot_type: ShotType; angle: Angle; camera_move: CameraMove;
-  focus: "kai" | "needle" | "both" | "graphic" | "background";
+  focus: CharacterId | "both" | "graphic" | "background";
   blocking: PlanBlocking[];
 }
 
@@ -50,6 +50,14 @@ export interface PlanLine {
   mouth: number[]; // 0..1 openness per frame of the line
 }
 
+export interface PlanWord { text: string; start_frame: number; end_frame: number }
+
+export interface PlanCaption {
+  speaker: CharacterId;
+  start_frame: number; end_frame: number;
+  lines: PlanWord[][];
+}
+
 export interface PlanTransition { type: TransitionType; frames: number }
 
 export interface PlanScene {
@@ -61,6 +69,7 @@ export interface PlanScene {
   shots: PlanShot[];
   graphics: PlanGraphic[];
   lines: PlanLine[];
+  captions?: PlanCaption[];
   transition_in: PlanTransition;
   transition_out: PlanTransition;
 }

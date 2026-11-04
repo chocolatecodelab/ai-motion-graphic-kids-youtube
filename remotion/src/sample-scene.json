@@ -9,19 +9,19 @@
       "start_frame": 0, "end_frame": 75, "shot_type": "wide", "angle": "eye_level",
       "camera_move": "dolly_in", "focus": "both",
       "blocking": [
-        {"character": "kai", "x": 0.35, "y": 0.92, "scale": 1, "depth": "midground", "facing": "right",
+        {"character": "arka", "x": 0.35, "y": 0.92, "scale": 1, "depth": "midground", "facing": "right",
          "pose": "walk", "expression": "curious", "action": null, "enter": "from_left", "exit": "none",
          "motion": "walk", "path": [{"x": 0.5, "y": 0.92, "scale": 1, "frame": 60}]},
-        {"character": "needle", "x": 0.68, "y": 0.45, "scale": 1, "depth": "foreground", "facing": "camera",
+        {"character": "lipa", "x": 0.68, "y": 0.45, "scale": 1, "depth": "foreground", "facing": "camera",
          "pose": "float", "expression": "delighted", "action": "sparkle", "enter": "pop", "exit": "none",
          "motion": "zip", "path": []}
       ]
     },
     {
       "start_frame": 75, "end_frame": 150, "shot_type": "close_up", "angle": "low",
-      "camera_move": "zoom_in", "focus": "kai",
+      "camera_move": "zoom_in", "focus": "arka",
       "blocking": [
-        {"character": "kai", "x": 0.5, "y": 0.92, "scale": 1, "depth": "midground", "facing": "camera",
+        {"character": "arka", "x": 0.5, "y": 0.92, "scale": 1, "depth": "midground", "facing": "camera",
          "pose": "talk", "expression": "surprised", "action": null, "enter": "none", "exit": "none",
          "motion": "none", "path": []}
       ]
@@ -32,9 +32,18 @@
      "start_frame": 85, "end_frame": 150}
   ],
   "lines": [
-    {"line_id": "S00-L01", "speaker": "kai", "text": "Why is the sky blue?", "emotion": "curious",
+    {"line_id": "S00-L01", "speaker": "arka", "text": "Why is the sky blue?", "emotion": "curious",
      "start_frame": 85, "end_frame": 140,
      "mouth": [0.1,0.5,0.8,0.6,0.3,0.7,0.9,0.4,0.2,0.6,0.8,0.5,0.1,0.0,0.3,0.7,0.9,0.6,0.4,0.2,0.5,0.8,0.7,0.3,0.1,0.4,0.6,0.9,0.7,0.5,0.2,0.0,0.3,0.6,0.8,0.5,0.2,0.4,0.7,0.6,0.3,0.1,0.0,0.2,0.5,0.7,0.4,0.2,0.1,0.0,0.0,0.0,0.0,0.0,0.0]}
+  ],
+  "captions": [
+    {"speaker": "arka", "start_frame": 85, "end_frame": 140, "lines": [[
+      {"text": "Why", "start_frame": 85, "end_frame": 95},
+      {"text": "is", "start_frame": 95, "end_frame": 103},
+      {"text": "the", "start_frame": 103, "end_frame": 110},
+      {"text": "sky", "start_frame": 110, "end_frame": 122},
+      {"text": "blue?", "start_frame": 122, "end_frame": 140}
+    ]]}
   ],
   "transition_in": {"type": "fade", "frames": 12},
   "transition_out": {"type": "compass_portal", "frames": 18}

@@ -46,7 +46,7 @@ def perfect_stt(tmp_path: Path, refs: dict) -> FakeSTT:
 
 
 def test_wer_normalizes_case_punctuation_and_numbers() -> None:
-    assert wer("Okay, Needle, show me the inside!", "okay needle show me the inside") == (0, 0)
+    assert wer("Okay, Lipa, show me the inside!", "okay lipa show me the inside") == (0, 0)
     assert wer("It has 3 parts.", "It has three parts")[1] == 0
     rate, errors = wer("Blue waves are short", "Blue waves are long")
     assert errors == 1 and rate == pytest.approx(0.25)
@@ -66,8 +66,8 @@ def test_voice_stage_writes_lines_preview_and_manifest(tmp_path: Path) -> None:
     assert len(manifest.lines) == refs_out["lines"] == 14
     first = manifest.lines[0]
     assert (tmp_path / "content" / first.file).exists() and first.voice == "af_heart"
-    needle = next(v for v in manifest.lines if v.speaker == "needle")
-    assert needle.voice == "af_sky" and needle.speed == 1.1
+    lipa = next(v for v in manifest.lines if v.speaker == "lipa")
+    assert lipa.voice == "af_sky" and lipa.speed == 1.1
     assert first.peak_dbfs <= -0.9  # normalised with a -1 dBFS ceiling
     assert manifest.lines[1].preview_start_s == pytest.approx(
         first.duration_s + manifest.gap_s, abs=1e-3)
@@ -114,7 +114,7 @@ def test_subtitles_match_script_and_follow_rules(tmp_path: Path) -> None:
     srt = (tmp_path / "content" / out["srt"]).read_text(encoding="utf-8")
     vtt = (tmp_path / "content" / out["vtt"]).read_text(encoding="utf-8")
     assert srt.startswith("1\n00:00:00,000 --> ") and vtt.startswith("WEBVTT")
-    assert "<v Needle>" in vtt and "<v Kai>" in vtt
+    assert "<v Lipa>" in vtt and "<v Arka>" in vtt
     manifest = VoiceManifest.model_validate_json(
         (tmp_path / "content" / voice["path"]).read_text(encoding="utf-8"))
     cues = build_cues(manifest)
