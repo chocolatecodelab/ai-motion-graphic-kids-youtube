@@ -9,6 +9,7 @@ from __future__ import annotations
 from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
@@ -50,6 +51,9 @@ class Settings(BaseSettings):
     llm_model_medium: str = "sonnet"  # storyboard, visual plan, research
     llm_model_low: str = "haiku"     # classification, SEO tags, cheap validation
     llm_timeout_s: int = Field(default=900, ge=10)
+
+    # Rendering: preview = 960x540 quick review clips; final = 1920x1080 for publishing.
+    render_quality: Literal["preview", "final"] = "preview"
 
     # Voices chosen by the owner in the 2026-11-04 bake-off (DECISIONS.md).
     tts_provider: str = "kokoro"

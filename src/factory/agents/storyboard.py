@@ -1,8 +1,10 @@
-"""`storyboard` stage: approved script -> storyboard.v1 JSON for the renderer.
+"""`storyboard` stage: approved script -> storyboard.v2 JSON for the renderer.
 
 Code validation: same scenes/beats as the script, every line exactly once and in
-order, rig IDs and component names from the catalogues, scene durations cover
-their dialogue, total within target ±10%. Failures go back to the model (max 2).
+order, rig IDs and component names from the catalogues, speakers on screen (or a
+voice-over shot), scene durations cover their dialogue, total within target ±10%,
+and the variety rules (shot sizes, angles, movement, no parked left/right pairs).
+Failures go back to the model (max 2).
 """
 
 from __future__ import annotations
@@ -19,11 +21,17 @@ from factory.pipeline import PermanentStageError, Stage, StageContext, StageResu
 from factory.providers.llm import LLMProvider, LLMRequest, Tier
 from factory.schemas.brief import TopicBrief
 from factory.schemas.script import Script
-from factory.schemas.storyboard import Storyboard, StoryboardDraft
+from factory.schemas.storyboard import (
+    OFFSCREEN_OK_SHOTS,
+    Shot,
+    Storyboard,
+    StoryboardDraft,
+    StoryboardScene,
+)
 from factory.storyboard_html import render_storyboard_html
 from factory.text import LINE_GAP_S
 
-PROMPT = "storyboard/v1"
+PROMPT = "storyboard/v2"
 MAX_REVISIONS = 2
 TOLERANCE = 0.10
 
@@ -70,18 +78,7 @@ def check_storyboard(draft: StoryboardDraft, script: Script, brief: TopicBrief) 
         if s.duration_s + 1e-6 < speech:
             issues.append(f"{s.scene_id} lasts {s.duration_s}s but its lines need "
                           f"{speech:.1f}s.")
-        speakers = {by_line[lid].speaker for lid in s.line_ids if lid in by_line}
-        on_screen = {c.character for c in s.characters}
-        if not speakers <= on_screen:
-            issues.append(f"{s.scene_id}: speakers {sorted(speakers)} must be in `characters`.")
-        for c in s.characters:
-            if c.pose not in rig.ids(c.character, "poses"):
-                issues.append(f"{s.scene_id}: unknown pose {c.pose!r} for {c.character}.")
-            if c.expression not in rig.ids(c.character, "expressions"):
-                issues.append(f"{s.scene_id}: unknown expression {c.expression!r} "
-                              f"for {c.character}.")
-            if c.action and c.action not in rig.ids(c.character, "actions"):
-                issues.append(f"{s.scene_id}: unknown action {c.action!r} for {c.character}.")
+        issues += check_shots(s, by_line, rig)
         for mg in s.motion_graphics:
             if mg.component not in comps.items:
                 issues.append(f"{s.scene_id}: unknown component {mg.component!r}.")
@@ -102,19 +99,116 @@ def check_storyboard(draft: StoryboardDraft, script: Script, brief: TopicBrief) 
                 issues.append(f"{s.scene_id}: sfx at_line {fx.at_line} is not in this scene.")
         if not (s.background.library_id or s.background.asset_request):
             issues.append(f"{s.scene_id}: background needs a library_id or asset_request.")
+        if s.background.theme is None:
+            issues.append(f"{s.scene_id}: background.theme is required (pick the closest "
+                          f"environment from the list).")
 
     total = sum(s.duration_s for s in draft.scenes)
     lo = brief.duration.min_s * (1 - TOLERANCE)
     hi = brief.duration.max_s * (1 + TOLERANCE)
     if not lo <= total <= hi:
         issues.append(f"Total duration {total:.1f}s is outside {lo:.0f}-{hi:.0f}s.")
+    issues += check_variety(draft)
+    return issues
+
+
+def shot_spans(scene: StoryboardScene) -> list[tuple[Shot, list[str]]]:
+    """Each shot with the line IDs spoken during it."""
+    starts = [scene.line_ids.index(sh.starts_at_line) if sh.starts_at_line in scene.line_ids
+              else 0 for sh in scene.shots]
+    spans = []
+    for i, sh in enumerate(scene.shots):
+        end = starts[i + 1] if i + 1 < len(starts) else len(scene.line_ids)
+        spans.append((sh, scene.line_ids[starts[i]:end]))
+    return spans
+
+
+def check_shots(s: StoryboardScene, by_line: dict, rig: resources.Rig) -> list[str]:  # type: ignore[type-arg]
+    issues: list[str] = []
+    prev_start = -1
+    for i, sh in enumerate(s.shots):
+        if i == 0 and sh.starts_at_line not in (None, s.line_ids[0] if s.line_ids else None):
+            issues.append(f"{s.scene_id}: the first shot must start at the scene start "
+                          f"(starts_at_line null).")
+        if i > 0:
+            if sh.starts_at_line not in s.line_ids:
+                issues.append(f"{s.scene_id} shot {i + 1}: starts_at_line must be a line of "
+                              f"this scene.")
+            else:
+                idx = s.line_ids.index(sh.starts_at_line)
+                if idx <= prev_start:
+                    issues.append(f"{s.scene_id}: shots must start at increasing lines.")
+                prev_start = idx
+        else:
+            prev_start = 0
+        for b in sh.blocking:
+            where = f"{s.scene_id} shot {i + 1} {b.character}"
+            if b.pose not in rig.ids(b.character, "poses"):
+                issues.append(f"{where}: unknown pose {b.pose!r}.")
+            if b.expression not in rig.ids(b.character, "expressions"):
+                issues.append(f"{where}: unknown expression {b.expression!r}.")
+            if b.action and b.action not in rig.ids(b.character, "actions"):
+                issues.append(f"{where}: unknown action {b.action!r}.")
+            for wp in b.path:
+                if wp.at_line and wp.at_line not in s.line_ids:
+                    issues.append(f"{where}: path at_line {wp.at_line} is not in this scene.")
+        if len({b.character for b in sh.blocking}) != len(sh.blocking):
+            issues.append(f"{s.scene_id} shot {i + 1}: a character appears twice.")
+    for sh, lines in shot_spans(s):
+        if sh.shot_type in OFFSCREEN_OK_SHOTS or sh.focus in ("graphic", "background"):
+            continue
+        speakers = {by_line[lid].speaker for lid in lines if lid in by_line}
+        on_screen = {b.character for b in sh.blocking}
+        missing = speakers - on_screen
+        if missing:
+            issues.append(f"{s.scene_id}: {sorted(missing)} speaks during a {sh.shot_type} "
+                          f"shot but is not in its blocking (use an insert/pov shot or focus "
+                          f"'graphic' for voice-over).")
+    return issues
+
+
+def _moves(sh: Shot) -> bool:
+    return sh.camera_move != "static" or any(
+        b.motion != "none" or b.path or b.enter != "none" or b.exit != "none"
+        for b in sh.blocking)
+
+
+def check_variety(draft: StoryboardDraft) -> list[str]:
+    """Adventure-style staging: owner direction (DECISIONS.md 2026-11-04)."""
+    issues: list[str] = []
+    shots = [(s.scene_id, sh) for s in draft.scenes for sh in s.shots]
+    for i in range(2, len(shots)):
+        trio = [sh for _, sh in shots[i - 2:i + 1]]
+        if len({sh.shot_type for sh in trio}) == 1:
+            issues.append(f"Three shots in a row are {trio[0].shot_type} "
+                          f"({', '.join(sid for sid, _ in shots[i - 2:i + 1])}). Vary the "
+                          f"shot sizes.")
+    if len({sh.shot_type for _, sh in shots}) < 4:
+        issues.append("Use at least 4 different shot types across the episode.")
+    if len({sh.angle for _, sh in shots}) < 3:
+        issues.append("Use at least 3 different camera angles across the episode.")
+    moving = sum(_moves(sh) for _, sh in shots)
+    if moving < len(shots) * 0.6:
+        issues.append(f"Only {moving}/{len(shots)} shots have camera or character movement; "
+                      f"make at least 60% move.")
+    for s in draft.scenes:
+        if s.beat == "adventure" and not any(_moves(sh) for sh in s.shots):
+            issues.append(f"{s.scene_id} is an adventure scene with no movement.")
+    parked = 0
+    for _, sh in shots:  # Kai left + Needle right, again and again
+        pos = {b.character: b.x for b in sh.blocking}
+        if pos.get("kai", 0.5) < 0.38 and pos.get("needle", 0.5) > 0.62:
+            parked += 1
+    if parked > len(shots) * 0.4:
+        issues.append(f"Kai is parked left and Needle right in {parked}/{len(shots)} shots; "
+                      f"vary their positions, depth and scale.")
     return issues
 
 
 class StoryboardStage(Stage):
     name = "storyboard"
     lane = Lane.LLM
-    version = "2"  # v2: numbers in graphics must cite a claim or be illustrative
+    version = "4"  # v3: storyboard.v2 shots/blocking + variety rules; v4: explicit theme
     depends_on = ("brief", "script", "script_validate")
     max_attempts = 2
 

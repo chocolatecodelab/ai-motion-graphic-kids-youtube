@@ -250,12 +250,26 @@ def test_numbers_allowed_when_illustrative_or_sourced() -> None:
 @pytest.mark.parametrize(
     ("mutate", "expect"),
     [
-        (lambda b: b["scenes"][0]["characters"][0].update(pose="backflip"), "unknown pose"),
+        (lambda b: b["scenes"][0]["shots"][0]["blocking"][0].update(pose="backflip"),
+         "unknown pose"),
         (lambda b: b["scenes"][3]["motion_graphics"].append({"component": "Fireworks"}),
          "unknown component"),
         (lambda b: b["scenes"][1]["line_ids"].pop(), "exactly once"),
         (lambda b: b["scenes"][2].update(duration_s=1.0), "lines need"),
-        (lambda b: b["scenes"][0]["characters"].pop(), "must be in `characters`"),
+        (lambda b: b["scenes"][0]["shots"][0]["blocking"].pop(), "not in its blocking"),
+        (lambda b: [s["shots"][0].update(shot_type="medium", camera_move="static",
+                                         angle="eye_level")
+                    or [bl.update(motion="none", path=[]) for bl in s["shots"][0]["blocking"]]
+                    for s in b["scenes"]], "Three shots in a row are medium"),
+        (lambda b: [s["shots"][0].update(camera_move="static")
+                    or [bl.update(motion="none", path=[]) for bl in s["shots"][0]["blocking"]]
+                    for s in b["scenes"]], "adventure scene with no movement"),
+        (lambda b: [[bl.update(x=0.2 if bl["character"] == "kai" else 0.8)
+                     for bl in s["shots"][0]["blocking"]] for s in b["scenes"]],
+         "parked left"),
+        (lambda b: b["scenes"][1]["shots"].append(
+            {"starts_at_line": "S01-L01", "shot_type": "close_up", "blocking": []}),
+         "starts_at_line must be a line of this scene"),
         (lambda b: b["scenes"][4]["motion_graphics"].append(
             {"component": "BarGrow", "props": {"items": [{"label": "violet", "value": 3}]}}),
          "no verified claim states"),
@@ -357,10 +371,10 @@ def test_end_to_end_with_approval_gate(tmp_path: Path) -> None:
     worker.run_until_idle()
     with scope() as s:
         jobs = {j.stage: j.status for j in s.scalars(select(ProductionJob))}
-        assert jobs == {"brief": JobStatus.SUCCEEDED, "script": JobStatus.SUCCEEDED,
-                        "script_validate": JobStatus.AWAITING_APPROVAL,
-                        "storyboard": JobStatus.PENDING, "voice": JobStatus.PENDING,
-                        "subtitles": JobStatus.PENDING}
+        assert {k: jobs.pop(k) for k in ("brief", "script", "script_validate")} == {
+            "brief": JobStatus.SUCCEEDED, "script": JobStatus.SUCCEEDED,
+            "script_validate": JobStatus.AWAITING_APPROVAL}
+        assert set(jobs.values()) == {JobStatus.PENDING}  # everything after the gate waits
         ep = s.get(Episode, ep_id)
         assert ep.status is EpisodeStatus.AWAITING_APPROVAL
         approve_stage(s, ep, "script_validate", wf, "owner", "Looks great")

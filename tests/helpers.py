@@ -83,16 +83,31 @@ def pass_review() -> dict[str, Any]:
     }
 
 
+SHOT_CYCLE = [  # (type, angle, camera move, kai x, needle x, kai motion)
+    ("wide", "eye_level", "dolly_in", 0.45, 0.62, "walk"),
+    ("medium", "low", "zoom_in", 0.55, 0.40, "none"),
+    ("close_up", "high", "static", 0.50, 0.70, "none"),
+    ("over_shoulder", "eye_level", "pan_right", 0.30, 0.55, "none"),
+    ("extreme_wide", "birds_eye", "zoom_out", 0.60, 0.45, "fly"),
+    ("medium", "tilted", "shake", 0.48, 0.35, "jump"),
+]
+
+
 def storyboard_for(script: Any, pad: float = 1.0) -> dict[str, Any]:
     scenes = []
-    for scene in script.draft.scenes:
+    for i, scene in enumerate(script.draft.scenes):
         lines = [ln for ln in script.lines if ln.scene_key == scene.key]
         speakers = {ln.speaker for ln in lines}
-        chars = [{"character": "kai", "pose": "talk", "expression": "curious",
-                  "position": "left"}]
+        shot_type, angle, move, kx, nx, kmotion = SHOT_CYCLE[i % len(SHOT_CYCLE)]
+        blocking = [{"character": "kai", "x": kx, "y": 0.9, "scale": 1.0, "pose": "talk",
+                     "expression": "curious", "motion": kmotion}]
         if "needle" in speakers:
-            chars.append({"character": "needle", "pose": "float", "expression": "delighted",
-                          "position": "right"})
+            blocking.append({"character": "needle", "x": nx, "y": 0.5, "scale": 0.6,
+                             "depth": "foreground", "pose": "float",
+                             "expression": "delighted", "motion": "zip",
+                             "path": [{"x": nx + 0.1, "y": 0.4, "scale": 0.6}]})
+        chars = [{"shot_type": shot_type, "angle": angle, "camera_move": move,
+                  "focus": "both", "blocking": blocking}]
         mg = []
         if scene.beat == "discovery":
             mg.append({"component": "WaveCompare", "props": {"waves": ["blue", "red"]},
@@ -100,8 +115,8 @@ def storyboard_for(script: Any, pad: float = 1.0) -> dict[str, Any]:
         scenes.append({
             "scene_id": scene.key, "beat": scene.beat, "objective": scene.summary,
             "duration_s": round(sum(ln.est_duration_s + 0.35 for ln in lines) + pad, 2),
-            "line_ids": [ln.line_id for ln in lines], "characters": chars,
-            "background": {"asset_request": f"flat vector {scene.location}"},
+            "line_ids": [ln.line_id for ln in lines], "shots": chars,
+            "background": {"theme": "attic", "asset_request": f"flat vector {scene.location}"},
             "motion_graphics": mg,
             "transition_out": {"type": "compass_portal" if scene.beat == "adventure" else "cut"},
             "educational_purpose": "understand the idea",

@@ -7,7 +7,12 @@
 - voice bake-off: Kai = Kokoro `af_heart`, Needle = `af_sky`;
 - job queue, worker and the `claude -p` LLM provider;
 - the brief → script → script review (owner approval) → storyboard stages;
-- voice (Kokoro per line, STT/WER check, line cache) and subtitles (SRT/VTT).
+- voice (Kokoro per line, STT/WER check, line cache) and subtitles (SRT/VTT);
+- storyboard v2 (shot types, angles, camera moves, character blocking + variety rules);
+- Remotion renderer (`remotion/`, v4.0.538): placeholder vector puppets for Kai & Needle,
+  9 parallax background themes, motion-graphics components, transitions;
+- timing (frame-accurate render plan, lip-flap curves) → render_scenes (cached scene clips) →
+  assemble (episode MP4, -14 LUFS).
 
 ## Quickstart (Windows, owner machine)
 
@@ -64,6 +69,8 @@ uv run factory worker --lane llm
 The storyboard stage also writes a visual review page, `storyboard/storyboard.vN.html`: a timeline, a layout sketch per scene, dialogue, graphics, sound effects and the claims with their sources. Rebuild it any time with `uv run factory storyboard-html <episode>`.
 
 After approval, `uv run factory worker --all-lanes` runs both the storyboard (llm lane) and voice + subtitles (media lane: Kokoro TTS plus a Whisper check). The storyboard page then embeds a player for every voiced line and the full voice-over preview. Open it in a normal browser to play audio. `uv run factory sync <episode>` adds stages that were introduced after an episode was created.
+
+Rendering needs `npm install` in `remotion/` once. The default `FACTORY_RENDER_QUALITY=preview` renders 960×540 clips for review, and they appear in the storyboard page (`uv run factory storyboard-html <episode>`). For the 1080p master, set `FACTORY_RENDER_QUALITY=final` and run `uv run factory retry <episode> render_scenes`; scenes are cached per quality. To preview a scene in Remotion Studio, run `npm run studio` inside `remotion/`.
 
 `factory retry <episode> <stage>` re-runs one stage (upstream results are reused). `factory cancel <episode>` stops an episode.
 

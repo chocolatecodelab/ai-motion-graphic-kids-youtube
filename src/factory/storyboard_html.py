@@ -22,7 +22,6 @@ BEAT_COLORS = {  # brand palette
 SPEAKER_COLORS = {"kai": "#55BBA5", "needle": "#F8C84A"}
 CAMERA_ICONS = {"static": "■", "push_in": "⤢ in", "pull_out": "⤡ out", "pan": "⇄",
                 "parallax": "≋", "orbit": "↻"}
-POS_LEFT = {"left": "8%", "center": "40%", "right": "72%"}
 
 CSS = """
 *{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;
@@ -63,6 +62,7 @@ border-bottom:1px dashed #e4ded2;font-size:15px;line-height:1.4}
 .claim{background:#EEF4FF;color:#243B75;border-radius:5px;padding:1px 5px;font-size:11px;
 font-weight:700;margin-left:4px;text-decoration:none}.est{font-size:11px;color:#999}
 audio.vo{display:block;height:28px;width:100%;max-width:320px;margin-top:4px}
+video.clip{width:100%;aspect-ratio:16/9;border-radius:10px;background:#000;display:block}
 h4{margin:12px 0 4px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#666}
 .kv{font-size:13px;color:#333}.kv code{background:#f5f2ec;padding:1px 4px;border-radius:4px;
 font-size:12px;word-break:break-word}.ill{background:#FFF3D6;color:#8a5a00;border-radius:5px;
@@ -82,34 +82,58 @@ def _claim_badges(ids: list[str]) -> str:
     return "".join(f'<a class="claim" href="#claim-{escape(c)}">{escape(c)}</a>' for c in ids)
 
 
-def _frame(scene: StoryboardScene) -> str:
+def _frame(scene: StoryboardScene, shot_index: int = 0, video_src: str | None = None) -> str:
+    """Layout sketch of one shot (or the scene's preview clip when rendered)."""
+    if video_src:
+        return (f'<video class="clip" controls preload="metadata" muted '
+                f'src="{escape(video_src)}"></video>')
+    shot = scene.shots[min(shot_index, len(scene.shots) - 1)]
     bg_text = scene.background.asset_request or f"library: {scene.background.library_id}"
     color = BEAT_COLORS.get(scene.beat, "#243B75")
     chars = []
-    for c in scene.characters:
-        if c.position == "offscreen":
-            continue
-        action = f" · {escape(c.action)}" if c.action else ""
+    for b in shot.blocking:
+        width = max(8.0, min(40.0, 14 * b.scale))
+        action = f" · {escape(b.action)}" if b.action else ""
+        motion = f" · {escape(b.motion)}" if b.motion != "none" else ""
+        z = {"foreground": 3, "midground": 2, "background": 1}[b.depth]
         chars.append(
-            f'<div class="char" style="left:{POS_LEFT[c.position]};'
-            f'background:{SPEAKER_COLORS.get(c.character, "#ddd")}">{escape(c.character.title())}'
-            f"<small>{escape(c.pose)} / {escape(c.expression)}{action}</small></div>"
+            f'<div class="char" style="left:{100 * b.x - width / 2:.1f}%;'
+            f'top:{max(0.0, 100 * b.y - 30):.1f}%;width:{width:.1f}%;z-index:{z};'
+            f'background:{SPEAKER_COLORS.get(b.character, "#ddd")}">{escape(b.character.title())}'
+            f"<small>{escape(b.pose)} / {escape(b.expression)}{action}{motion}</small></div>"
         )
     mgs = "".join(f"<span>{escape(m.component)}</span>" for m in scene.motion_graphics)
-    cam = scene.camera
-    zoom = f" {cam.zoom_from:g}→{cam.zoom_to:g}" if cam.zoom_from != cam.zoom_to else ""
     return (
         f'<div class="frame" style="background:{color}">'
         f'<div class="bg"><em>{escape(bg_text)}</em></div>'
         f'<div class="mg">{mgs}</div>{"".join(chars)}'
-        f'<div class="cam">🎥 {escape(CAMERA_ICONS.get(cam.move, cam.move))}{zoom}</div>'
+        f'<div class="cam">🎥 {escape(shot.shot_type)} · {escape(shot.angle)} · '
+        f'{escape(CAMERA_ICONS.get(shot.camera_move, shot.camera_move))}</div>'
         f'<div class="trans">→ {escape(scene.transition_out.type)} '
         f"{scene.transition_out.duration_s:g}s</div></div>"
     )
 
 
+def _shots_table(scene: StoryboardScene) -> str:
+    rows = []
+    for i, sh in enumerate(scene.shots, start=1):
+        who = "; ".join(
+            f"{escape(b.character)} @({b.x:.2f},{b.y:.2f}) ×{b.scale:g} {escape(b.depth)} "
+            f"{escape(b.motion) if b.motion != 'none' else ''}"
+            f"{' path→' + str(len(b.path)) if b.path else ''}"
+            f"{' enter:' + escape(b.enter) if b.enter != 'none' else ''}"
+            for b in sh.blocking) or "–"
+        start = escape(sh.starts_at_line or "start")
+        rows.append(f"<div class='kv'><b>Shot {i}</b> @ <code>{start}</code>: "
+                    f"{escape(sh.shot_type)}, {escape(sh.angle)}, {escape(sh.camera_move)}, "
+                    f"focus {escape(sh.focus)}<br><small>{who}</small>"
+                    f"{'<br><i>' + escape(sh.note) + '</i>' if sh.note else ''}</div>")
+    return "".join(rows)
+
+
 def _scene(scene: StoryboardScene, script: Script, start_s: float,
-           audio: dict[str, tuple[str, float]] | None = None) -> str:
+           audio: dict[str, tuple[str, float]] | None = None,
+           video_src: str | None = None) -> str:
     by_id = {ln.line_id: ln for ln in script.lines}
     audio = audio or {}
     lines = []
@@ -153,13 +177,12 @@ def _scene(scene: StoryboardScene, script: Script, start_s: float,
     <span class="badge" style="background:{color}">{escape(scene.beat)}</span>
     <span class="dur">{scene.duration_s:g}s · {_ts(start_s)}–{_ts(end_s)}</span>
     <span class="obj">{escape(scene.objective)}</span></div>
-  <div>{_frame(scene)}
+  <div>{_frame(scene, 0, video_src)}
+    <h4>Shots ({len(scene.shots)})</h4>{_shots_table(scene)}
     <h4>Background</h4><div class="kv">{escape(scene.background.asset_request or '')}
       {f'library <code>{escape(scene.background.library_id)}</code>'
        if scene.background.library_id else ''}
-      · {scene.background.parallax_layers} parallax layers</div>
-    <h4>Camera / transition</h4><div class="kv">{escape(scene.camera.move)}
-      ({scene.camera.zoom_from:g}→{scene.camera.zoom_to:g}, {escape(scene.camera.easing)})
+      · {scene.background.parallax_layers} parallax layers
       · out: {escape(scene.transition_out.type)} {scene.transition_out.duration_s:g}s</div>
   </div>
   <div><h4>Dialogue</h4><ul class="lines">{''.join(lines)}</ul>
@@ -176,8 +199,11 @@ def _ts(seconds: float) -> str:
 def render_storyboard_html(
     board: Storyboard, script: Script, brief: TopicBrief, version: int,
     audio: dict[str, tuple[str, float]] | None = None, preview_src: str | None = None,
+    clips: dict[str, str] | None = None,
 ) -> str:
-    """`audio` maps line_id -> (src relative to the HTML file, voiced duration)."""
+    """`audio` maps line_id -> (src relative to the HTML file, voiced duration).
+    `clips` maps scene_id -> rendered preview clip (relative src); replaces the sketch."""
+    clips = clips or {}
     total = board.total_duration_s or 1
     strip = "".join(
         f'<a href="#{escape(s.scene_id)}" title="{escape(s.scene_id)} {escape(s.beat)} '
@@ -189,11 +215,18 @@ def render_storyboard_html(
                      for b, c in BEAT_COLORS.items())
     scenes, t = [], 0.0
     for s in board.scenes:
-        scenes.append(_scene(s, script, t, audio))
+        scenes.append(_scene(s, script, t, audio, clips.get(s.scene_id)))
         t += s.duration_s
-    preview = (f'<div class="kv" style="margin:0 0 18px"><b>🔊 Full voice-over preview</b>'
-               f'<br><audio controls preload="none" style="width:100%" '
-               f'src="{escape(preview_src)}"></audio></div>' if preview_src else "")
+    if preview_src and preview_src.endswith(".mp4"):
+        preview = (f'<div class="kv" style="margin:0 0 18px"><b>🎬 Full episode preview</b>'
+                   f'<video controls preload="metadata" style="width:100%;border-radius:12px;'
+                   f'margin-top:6px" src="{escape(preview_src)}"></video></div>')
+    elif preview_src:
+        preview = (f'<div class="kv" style="margin:0 0 18px"><b>🔊 Full voice-over preview</b>'
+                   f'<br><audio controls preload="none" style="width:100%" '
+                   f'src="{escape(preview_src)}"></audio></div>')
+    else:
+        preview = ""
     sources = {src.id: src for src in brief.sources}
     claim_items = []
     for c in brief.claims:

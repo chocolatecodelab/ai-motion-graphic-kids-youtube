@@ -98,6 +98,22 @@ The owner approved the pilot storyboard (v2) to continue, with two requirements 
    - **character blocking:** free x/y position, scale and depth (foreground/midground/background), facing direction, entrances and exits, and movement paths during the scene (walk, run, fly, float, shrink or grow), timed to lines;
    - **a variety rule** checked in code: no more than two consecutive scenes with the same shot type and blocking, and every adventure scene must include movement.
 
+## 2026-11-04: First full render of the pilot (measured on the owner's laptop)
+
+| Step | Result |
+|---|---|
+| Storyboard v2 (dynamic shots) | 9 scenes, 33 shots; passed all variety rules on the first try |
+| Timing | 164.0 s episode, 4,920 frames, lip-flap curves from the voice audio |
+| Render 540p preview | ~11 s per scene (≈1.6× real time) |
+| Render 1080p final | 269 s for 164 s of video (0.61× real time); scene clips cached per quality |
+| Assemble | H.264 + AAC, −14.5 LUFS integrated, −1.0 dBTP true peak |
+| Claude usage for the whole pilot | 16 `claude -p` calls (≈$1.92 equivalent API cost, covered by the subscription) |
+
+Known limitations, to be addressed in M2 (art direction):
+- Kai, Needle and the backgrounds are v0 placeholders drawn in code.
+- Graphics shown in insert/graphic-focus shots can still overlap a character.
+- Music and SFX are not mixed yet: voice only.
+
 ## 2026-11-04: Media tooling (owner: "use remotion, hyperframes, motion-skill, whisper, ffmpeg, threejs, yt-dlp where best practice says so")
 
 | Tool | Decision | Reason |

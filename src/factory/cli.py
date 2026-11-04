@@ -80,7 +80,7 @@ def pilot(brief: Path = typer.Argument(DEFAULT_PILOT, exists=True, dir_okay=Fals
 def worker(
     lane: Lane = typer.Option(Lane.LLM, help="Which lane to process"),
     all_lanes: bool = typer.Option(False, "--all-lanes",
-                                   help="Process llm + media lanes until all are idle"),
+                                   help="Process llm + media + render lanes until idle"),
     loop: bool = typer.Option(False, help="Keep polling instead of exiting when idle"),
     poll_s: int = typer.Option(15, help="Seconds between polls in --loop mode"),
 ) -> None:
@@ -88,7 +88,7 @@ def worker(
     from factory.pipeline.runner import Worker
 
     workflow = _workflow()
-    lanes = [Lane.LLM, Lane.MEDIA] if all_lanes else [lane]
+    lanes = [Lane.LLM, Lane.MEDIA, Lane.RENDER] if all_lanes else [lane]
     workers = [Worker(ln, workflow, session_scope, get_settings()) for ln in lanes]
     console.print("workers started: " + ", ".join(w.worker_id for w in workers))
     try:
@@ -214,6 +214,7 @@ def storyboard_html(episode: str) -> None:
     from factory.db.models import JobStatus
     from factory.pipeline import queue
     from factory.schemas.brief import TopicBrief
+    from factory.schemas.renderplan import RenderPlan
     from factory.schemas.script import Script
     from factory.schemas.storyboard import Storyboard
     from factory.services import find_episode
@@ -227,35 +228,48 @@ def storyboard_html(episode: str) -> None:
         except ValueError as exc:
             console.print(f"[red]{exc}[/] (storyboard must have {JobStatus.SUCCEEDED.value})")
             raise typer.Exit(1) from exc
-        try:
-            voice_ref = queue.upstream_outputs(s, ep.id, ("voice",))["voice"]
-        except ValueError:
-            voice_ref = None
+        def optional(stage: str) -> dict | None:  # type: ignore[type-arg]
+            try:
+                return queue.upstream_outputs(s, ep.id, (stage,))[stage]
+            except ValueError:
+                return None
+
+        voice_ref = optional("voice")
+        render_ref = optional("render_scenes")
+        assemble_ref = optional("assemble")
+        timing_ref = optional("timing")
     board = artifacts.read_model(content, refs["storyboard"], Storyboard)
     script = artifacts.read_model(content, refs["script"], Script)
     brief = artifacts.read_model(content, refs["brief"], TopicBrief)
     version = int(refs["storyboard"]["version"])
     out = content / Path(refs["storyboard"]["path"]).with_suffix(".html")
 
-    audio, preview = None, None
-    if voice_ref is not None:
-        import os
+    import os
 
+    def rel(p: str) -> str:
+        return Path(os.path.relpath(content / p, out.parent)).as_posix()
+
+    audio, preview, clips = None, None, None
+    if voice_ref is not None:
         from factory.schemas.voice import VoiceManifest
 
         manifest = artifacts.read_model(content, voice_ref, VoiceManifest)
-
-        def rel(p: str) -> str:
-            return Path(os.path.relpath(content / p, out.parent)).as_posix()
-
         if manifest.script_version == script.version:
             audio = {v.line_id: (rel(v.file), v.duration_s) for v in manifest.lines}
             preview = rel(manifest.preview_file)
         else:
             console.print("[yellow]voice is from an older script version; not embedded[/]")
-    out.write_text(render_storyboard_html(board, script, brief, version, audio, preview),
+    plan_matches = (timing_ref is not None and render_ref is not None
+                    and artifacts.read_model(content, timing_ref, RenderPlan).storyboard_version
+                    == version)
+    if plan_matches and render_ref is not None:
+        clips = {c["scene_id"]: rel(c["file"]) for c in render_ref["clips"]}
+    if assemble_ref is not None and plan_matches:
+        preview = rel(assemble_ref["video"])
+    out.write_text(render_storyboard_html(board, script, brief, version, audio, preview, clips),
                    encoding="utf-8")
-    console.print(f"wrote {out}" + (" (with voice-over)" if audio else ""))
+    extras = [x for x, ok in (("voice-over", audio), ("scene clips", clips)) if ok]
+    console.print(f"wrote {out}" + (f" (with {', '.join(extras)})" if extras else ""))
 
 
 @app.command()

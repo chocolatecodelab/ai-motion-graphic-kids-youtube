@@ -1,4 +1,9 @@
-"""Storyboard v1: the machine-readable contract between Python and Remotion.
+"""Storyboard v2: the machine-readable contract between Python and Remotion.
+
+v2 (owner direction, DECISIONS.md 2026-11-04) replaces the static left/right
+character placement with **shots**. Each shot has a type, angle, camera move,
+focus, and full character blocking: free position, depth, scale, facing,
+entrances and exits, motion and a movement path timed to lines.
 
 Component names and rig IDs are validated against config/catalogue/*.yaml by
 code (agents/storyboard.py), so the JSON Schema stays generic and small.
@@ -12,33 +17,76 @@ from pydantic import BaseModel, Field
 
 from factory.schemas.script import Beat
 
-CameraMove = Literal["static", "push_in", "pull_out", "pan", "parallax", "orbit"]
-Easing = Literal["linear", "ease_in", "ease_out", "ease_in_out", "spring"]
-TransitionType = Literal["compass_portal", "wipe", "cut", "zoom_through", "fade"]
+ShotType = Literal["extreme_wide", "wide", "medium", "close_up", "extreme_close_up",
+                   "over_shoulder", "pov", "insert"]
+Angle = Literal["eye_level", "low", "high", "birds_eye", "tilted"]
+CameraMove = Literal["static", "zoom_in", "zoom_out", "dolly_in", "dolly_out", "pan_left",
+                     "pan_right", "tilt_up", "tilt_down", "truck_left", "truck_right", "follow",
+                     "whip_pan", "crane_up", "crane_down", "shake", "orbit"]
+Focus = Literal["kai", "needle", "both", "graphic", "background"]
+Depth = Literal["foreground", "midground", "background"]
+Motion = Literal["none", "walk", "run", "fly", "float", "jump", "shrink", "grow", "spin",
+                 "bounce", "zip"]
+Entrance = Literal["none", "from_left", "from_right", "from_top", "from_bottom", "pop", "portal"]
+TransitionType = Literal["compass_portal", "wipe", "cut", "zoom_through", "fade", "whip"]
+
+# Shot types where the speaker may be off screen (voice heard over the image).
+OFFSCREEN_OK_SHOTS = {"insert", "pov", "extreme_wide"}
 
 
-class CharacterAction(BaseModel):
+class Waypoint(BaseModel):
+    x: float = Field(ge=-0.3, le=1.3, description="0 = left edge, 1 = right edge")
+    y: float = Field(ge=0.0, le=1.3, description="Feet/ground line; 0 = top, 1 = bottom")
+    scale: float = Field(default=1.0, ge=0.1, le=4.0)
+    at_line: str | None = Field(default=None, description="Reach this point by this line; "
+                                                          "null = end of the shot")
+
+
+class Blocking(BaseModel):
     character: Literal["kai", "needle"]
-    pose: str = Field(description="Rig pose ID from the rig contract")
-    expression: str = Field(description="Rig expression ID from the rig contract")
+    x: float = Field(ge=-0.3, le=1.3, description="Horizontal position, 0..1 of the frame")
+    y: float = Field(ge=0.0, le=1.3, description="Ground line, 0..1 of the frame (1 = bottom)")
+    scale: float = Field(default=1.0, ge=0.1, le=4.0, description="1 = medium-shot size")
+    depth: Depth = "midground"
+    facing: Literal["left", "right", "camera"] = "camera"
+    pose: str = Field(description="Rig pose ID")
+    expression: str = Field(description="Rig expression ID")
     action: str | None = Field(default=None, description="Optional rig action ID")
-    position: Literal["left", "center", "right", "offscreen"] = "left"
+    enter: Entrance = "none"
+    exit: Entrance = "none"
+    motion: Motion = "none"
+    path: list[Waypoint] = Field(default_factory=list, max_length=4)
+
+
+class Shot(BaseModel):
+    starts_at_line: str | None = Field(default=None, description="null = start of the scene")
+    shot_type: ShotType
+    angle: Angle = "eye_level"
+    camera_move: CameraMove = "static"
+    focus: Focus = "both"
+    blocking: list[Blocking] = Field(default_factory=list, max_length=2)
+    note: str = Field(default="", max_length=140, description="Director's intent")
+
+
+Theme = Literal["attic", "workbench", "sunbeam", "sky", "air", "sunset", "mars", "space",
+                "studio"]
 
 
 class Background(BaseModel):
+    theme: Theme | None = Field(
+        default=None,
+        description="Environment the renderer draws: attic (grandparent's attic, round window), "
+                    "workbench (attic workbench with tools), sunbeam (inside a beam of light, "
+                    "rainbow ribbons), sky (open sky, clouds, rooftops), air (among air "
+                    "molecules), sunset (low sun, warm sky, hills), mars (Martian landscape), "
+                    "space (stars, planets), studio (neutral backdrop)",
+    )
     library_id: str | None = Field(default=None, description="Reuse an existing library scene")
     asset_request: str | None = Field(
         default=None, max_length=300,
         description="Description of a new background (vector style, no text)",
     )
     parallax_layers: int = Field(default=3, ge=1, le=5)
-
-
-class Camera(BaseModel):
-    move: CameraMove = "static"
-    zoom_from: float = Field(default=1.0, ge=0.5, le=3.0)
-    zoom_to: float = Field(default=1.0, ge=0.5, le=3.0)
-    easing: Easing = "ease_in_out"
 
 
 class MotionGraphic(BaseModel):
@@ -72,9 +120,8 @@ class StoryboardScene(BaseModel):
     objective: str = Field(max_length=200)
     duration_s: float = Field(gt=0, le=120)
     line_ids: list[str] = Field(description="Script line IDs spoken in this scene, in order")
-    characters: list[CharacterAction] = Field(min_length=1, max_length=2)
+    shots: list[Shot] = Field(min_length=1, max_length=4)
     background: Background
-    camera: Camera = Camera()
     motion_graphics: list[MotionGraphic] = Field(default_factory=list)
     sfx: list[SoundEffect] = Field(default_factory=list)
     transition_out: Transition = Transition()
@@ -88,7 +135,7 @@ class StoryboardDraft(BaseModel):
 
 
 class Storyboard(BaseModel):
-    schema_version: Literal["storyboard.v1"] = "storyboard.v1"
+    schema_version: Literal["storyboard.v2"] = "storyboard.v2"
     episode_slug: str
     script_version: int
     fps: int = 30
