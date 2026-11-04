@@ -109,6 +109,11 @@ The owner approved the pilot storyboard (v2) to continue, with two requirements 
 | Assemble | H.264 + AAC, −14.5 LUFS integrated, −1.0 dBTP true peak |
 | Claude usage for the whole pilot | 16 `claude -p` calls (≈$1.92 equivalent API cost, covered by the subscription) |
 
+Technical QA (`qa` stage) on the 1080p final: **PASS, 95/100**.
+- Clean: spec, decode, no black or frozen frames, −14.5 LUFS / −1.0 dBTP, no dropouts, speech WER 3.3%, subtitle text identical to the script, subtitle sync +147 ms, claims, rights.
+- One warning: 3 silent gaps over 2.5 s, because there is no music bed yet.
+- 12 seeded-defect tests prove QA catches black frames, wrong orientation, duration drift, clipping, dropouts, a replaced VO line, subtitle drift (+800 ms), mismatched subtitle text, unverified claims, fonts without a licence, and non-commercial voice licences.
+
 Known limitations, to be addressed in M2 (art direction):
 - Kai, Needle and the backgrounds are v0 placeholders drawn in code.
 - Graphics shown in insert/graphic-focus shots can still overlap a character.

@@ -12,7 +12,9 @@
 - Remotion renderer (`remotion/`, v4.0.538): placeholder vector puppets for Kai & Needle,
   9 parallax background themes, motion-graphics components, transitions;
 - timing (frame-accurate render plan, lip-flap curves) → render_scenes (cached scene clips) →
-  assemble (episode MP4, -14 LUFS).
+  assemble (episode MP4, -14 LUFS) → qa (technical QA report, blocks on critical defects).
+
+**M1 exit criteria met:** `uv run factory run-episode` takes the pilot brief to a QA-passed 1080p MP4. It stops once, for the owner's script approval; continue with `--episode <slug>`.
 
 ## Quickstart (Windows, owner machine)
 

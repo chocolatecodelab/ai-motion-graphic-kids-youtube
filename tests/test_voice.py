@@ -188,5 +188,6 @@ def test_end_to_end_media_lane(tmp_path: Path) -> None:
         jobs = {j.stage: j.status for j in s.scalars(select(ProductionJob))}
         assert jobs.pop("render_scenes") is JobStatus.QUEUED  # render lane: next step
         assert jobs.pop("assemble") is JobStatus.PENDING
+        assert jobs.pop("qa") is JobStatus.PENDING
         assert set(jobs.values()) == {JobStatus.SUCCEEDED}, jobs  # incl. timing
         assert s.get(Episode, ep_id).status is EpisodeStatus.IN_PRODUCTION

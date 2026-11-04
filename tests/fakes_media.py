@@ -10,7 +10,7 @@ from factory.providers.tts.base import TTSInfo, TTSResult, WordTiming
 
 
 class FakeTTS:
-    info = TTSInfo(engine="fake", model="fake-tts", license="test")
+    info = TTSInfo(engine="fake", model="fake-tts", license="Apache-2.0")
 
     def __init__(self, silent: bool = False):
         self.silent = silent

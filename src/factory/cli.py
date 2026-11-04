@@ -76,6 +76,52 @@ def pilot(brief: Path = typer.Argument(DEFAULT_PILOT, exists=True, dir_okay=Fals
                       f"Run: [cyan]uv run factory worker --lane llm[/]")
 
 
+@app.command("run-episode")
+def run_episode(
+    brief: Path = typer.Argument(DEFAULT_PILOT, exists=True, dir_okay=False),
+    episode: str = typer.Option(None, help="Continue an existing episode instead of creating one"),
+) -> None:
+    """One command: create the episode (or continue it) and run every lane until it is done
+    or waiting for the owner's approval."""
+    from factory.pipeline.runner import Worker
+    from factory.services import create_episode_from_brief, find_episode
+
+    workflow = _workflow()
+    with session_scope() as s:
+        if episode:
+            ep = find_episode(s, episode)
+        else:
+            try:
+                ep = create_episode_from_brief(s, brief, get_settings(), workflow)
+            except ValueError as exc:
+                console.print(f"[red]{exc}[/] (use --episode to continue it)")
+                raise typer.Exit(1) from exc
+        slug, ep_id = ep.slug, ep.id
+    console.print(f"episode [bold]{slug}[/]")
+    workers = [Worker(ln, workflow, session_scope, get_settings())
+               for ln in (Lane.LLM, Lane.MEDIA, Lane.RENDER)]
+    did_work = True
+    while did_work:
+        did_work = False
+        for w in workers:
+            for o in w.run_until_idle():
+                did_work = True
+                style = _JOB_STYLE.get(o.status.value, "white")
+                console.print(f"  [{w.lane.value}] {o.stage}: [{style}]{o.status.value}[/]")
+    with session_scope() as s:
+        jobs = s.scalars(select(ProductionJob).where(ProductionJob.episode_id == ep_id)).all()
+        waiting = [j.stage for j in jobs if j.status.value == "awaiting_approval"]
+        failed = [j for j in jobs if j.status.value in ("failed_permanent", "failed_retryable")]
+        ep_status = s.get(Episode, ep_id).status.value  # type: ignore[union-attr]
+    if waiting:
+        console.print(f"[cyan]Waiting for your approval:[/] {', '.join(waiting)} → review, then "
+                      f"`factory approve {slug} {waiting[0]}` and run "
+                      f"`factory run-episode --episode {slug}` again.")
+    for j in failed:
+        console.print(f"[red]{j.stage} {j.status.value}:[/] {(j.error_message or '')[:300]}")
+    console.print(f"episode status: [bold]{ep_status}[/]")
+
+
 @app.command()
 def worker(
     lane: Lane = typer.Option(Lane.LLM, help="Which lane to process"),
@@ -139,11 +185,22 @@ def status(episode: str = typer.Argument(None, help="Episode slug, number or id"
             table.add_row(j.stage, f"[{style}]{j.status.value}[/]", str(j.attempt), detail[:300])
         console.print(table)
         if usage:
-            calls = len(usage)
-            tokens_out = sum(int((u.units or {}).get("output_tokens", 0)) for u in usage)
-            cost = sum(float(u.cost_usd) for u in usage)
-            console.print(f"LLM calls: {calls} · output tokens: {tokens_out} · "
-                          f"equivalent API cost: ${cost:.2f} (subscription, not billed)")
+            per: dict[str, list[float]] = {}
+            for u in usage:
+                agent = str((u.units or {}).get("agent", "other"))
+                row = per.setdefault(agent, [0, 0, 0.0])
+                row[0] += 1
+                row[1] += int((u.units or {}).get("output_tokens", 0))
+                row[2] += float(u.cost_usd)
+            cost_table = Table(title="usage per stage (claude -p, subscription: not billed)")
+            for col in ("stage", "calls", "output tokens", "equiv. API $"):
+                cost_table.add_column(col)
+            for agent, (calls, toks, cost) in sorted(per.items()):
+                cost_table.add_row(agent, str(int(calls)), str(int(toks)), f"{cost:.2f}")
+            total = [sum(r[i] for r in per.values()) for i in range(3)]
+            cost_table.add_row("[bold]total[/]", str(int(total[0])), str(int(total[1])),
+                               f"{total[2]:.2f}")
+            console.print(cost_table)
 
 
 @app.command()

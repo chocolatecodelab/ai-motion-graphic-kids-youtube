@@ -42,6 +42,12 @@ class Transcriber(Protocol):
     def transcribe(self, path: Path, hint: str = "") -> str: ...
 
 
+class WordTranscriber(Protocol):
+    model_name: str
+
+    def transcribe_words(self, path: Path, hint: str = "") -> list[tuple[str, float, float]]: ...
+
+
 class WhisperTranscriber:
     def __init__(self, model_name: str = "base.en"):
         self.model_name = model_name
@@ -62,3 +68,12 @@ class WhisperTranscriber:
             initial_prompt=hint or None, condition_on_previous_text=False,
         )
         return " ".join(s.text.strip() for s in segments).strip()
+
+    def transcribe_words(self, path: Path, hint: str = "") -> list[tuple[str, float, float]]:
+        """(word, start_s, end_s) for every recognised word (used for subtitle sync QA)."""
+        segments, _ = self._load().transcribe(
+            load_16k_mono(path), language="en", beam_size=5, word_timestamps=True,
+            initial_prompt=hint or None, condition_on_previous_text=False, vad_filter=False,
+        )
+        return [(w.word.strip(), float(w.start), float(w.end))
+                for s in segments for w in (s.words or []) if w.word.strip()]

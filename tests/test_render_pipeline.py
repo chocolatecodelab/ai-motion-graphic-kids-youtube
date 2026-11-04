@@ -137,6 +137,51 @@ def test_render_and_assemble_episode(tmp_path: Path, chain: dict) -> None:
     assert out["srt"].endswith("en.srt") and (tmp_path / "content" / out["srt"]).exists()
 
 
+class PlanWords:
+    """Fake word-level STT: 'hears' each script line exactly when the plan schedules it."""
+
+    model_name = "fake-words"
+
+    def __init__(self, plan: RenderPlan, script: Script, garble: bool = False):
+        self.plan, self.script, self.garble = plan, script, garble
+
+    def transcribe_words(self, path: Path, hint: str = "") -> list[tuple[str, float, float]]:
+        text = {ln.line_id: ln.text for ln in self.script.lines}
+        out = []
+        for cue in self.plan.audio:
+            words = text[cue.line_id].split() if not self.garble else ["pizza"] * 3
+            step = cue.duration_s / max(1, len(words))
+            out += [(w, cue.start_s + 0.3 + i * step, cue.start_s + 0.3 + (i + 1) * step)
+                    for i, w in enumerate(words)]
+        return out
+
+
+def test_qa_stage_passes_good_episode_and_blocks_bad_speech(tmp_path: Path, chain: dict) -> None:
+    from factory.agents.qa import QAStage
+    from factory.schemas.qa import QAReport
+
+    chain["timing"] = TimingStage().run(ctx(tmp_path, "timing", chain)).output_refs
+    chain["render_scenes"] = RenderScenesStage(
+        renderer_factory=FakeRenderer, code_hash_fn=lambda: "qa").run(
+        ctx(tmp_path, "render_scenes", chain)).output_refs
+    chain["assemble"] = AssembleStage().run(ctx(tmp_path, "assemble", chain)).output_refs
+    plan = RenderPlan.model_validate_json(
+        (tmp_path / "content" / chain["timing"]["path"]).read_text(encoding="utf-8"))
+    script = Script.model_validate_json(
+        (tmp_path / "content" / chain["script"]["path"]).read_text(encoding="utf-8"))
+
+    out = QAStage(PlanWords(plan, script)).run(ctx(tmp_path, "qa", chain)).output_refs
+    report = QAReport.model_validate_json(
+        (tmp_path / "content" / out["path"]).read_text(encoding="utf-8"))
+    assert out["verdict"] == "pass" and report.score >= 80, report.critical + report.warnings
+    assert {c.id for c in report.checks} >= {"spec.resolution", "video.black_frames",
+                                             "audio.loudness", "speech.wer", "subtitles.sync",
+                                             "content.claims", "rights.fonts"}
+
+    with pytest.raises(PermanentStageError, match="speech.wer.*re-run voice"):
+        QAStage(PlanWords(plan, script, garble=True)).run(ctx(tmp_path, "qa", chain))
+
+
 def test_render_rejects_wrong_duration(tmp_path: Path, chain: dict) -> None:
     chain["timing"] = TimingStage().run(ctx(tmp_path, "timing", chain)).output_refs
 
