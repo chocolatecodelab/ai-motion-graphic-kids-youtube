@@ -28,8 +28,9 @@ const NECK_Y = -108;
 export const HEAD_SCALE = 1.08;
 const ARM_W = 17;
 const LEG_W = 21;
-const OUT = 4.6; // total outline thickness added to stroked limbs
-const SW = 3.2; // outline width for filled shapes
+const OUT = 3.0; // inner outline thickness added to stroked limbs (silhouette is separate)
+const SW = 2.3; // inner outline width for filled shapes
+const SIL = 3.0; // silhouette outline radius (rig units) drawn around the whole figure
 
 const ink = { stroke: C.ink, strokeWidth: SW, strokeLinejoin: "round" as const, strokeLinecap: "round" as const };
 
@@ -52,6 +53,14 @@ export type ArkaProps = {
 
 /* ------------------------------ helpers ---------------------------- */
 
+/** CSS for the silhouette pass: every shape becomes solid ink with a thick round stroke.
+ *  `!important` beats the presentation attributes on the cloned shapes. */
+export const silhouetteCss = (cls: string, radius: number) =>
+  `.${cls} * { fill: ${C.ink} !important; stroke: ${C.ink} !important; ` +
+  `stroke-width: ${(radius * 2).toFixed(2)}px !important; stroke-linejoin: round !important; ` +
+  `stroke-linecap: round !important; opacity: 1 !important; }`;
+
+
 const Stroked: React.FC<{ d: string; w: number; color: string; cap?: "round" | "butt" }> = ({
   d,
   w,
@@ -70,11 +79,80 @@ const P = (v: Vec) => `${v.x.toFixed(2)} ${v.y.toFixed(2)}`;
 /** Polish (owner request): limb path with straight bones and a rounded joint (fillet)
  *  instead of a hard kink, so elbows and knees bend smoothly through every pose blend. */
 const FILLET = 0.42;
-const limbPath = (l: { a: Vec; mid: Vec; end: Vec }) => {
+
+
+
+/* -------------------------- tapered limb shapes -------------------------- */
+/* Limbs are filled shapes built along the filleted centreline, with widths easing from
+   root to tip (shoulder > elbow > wrist, thigh > knee > ankle). Clothing (sleeve, shorts
+   leg, sock, cuff) is a section of the same centreline, so it wraps the limb exactly. */
+
+const lerpV = (a: Vec, b: Vec, k: number): Vec => ({ x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k });
+
+/** Points along the filleted limb centreline (straight bone, rounded joint, straight bone). */
+const limbPoints = (l: { a: Vec; mid: Vec; end: Vec }, n = 30): Vec[] => {
   const p1 = along(l.mid, l.a, FILLET);
   const p2 = along(l.mid, l.end, FILLET);
-  return `M${P(l.a)} L${P(p1)} Q${P(l.mid)} ${P(p2)} L${P(l.end)}`;
+  const pts: Vec[] = [];
+  const third = Math.round(n / 3);
+  for (let i = 0; i < third; i++) pts.push(lerpV(l.a, p1, i / third));
+  for (let i = 0; i < third; i++) {
+    const t = i / third;
+    const u = 1 - t;
+    pts.push({ x: u * u * p1.x + 2 * u * t * l.mid.x + t * t * p2.x, y: u * u * p1.y + 2 * u * t * l.mid.y + t * t * p2.y });
+  }
+  for (let i = 0; i <= third; i++) pts.push(lerpV(p2, l.end, i / third));
+  return pts;
 };
+
+/** Sub-polyline between arc-length fractions f0..f1 (resampled to n points). */
+const section = (pts: Vec[], f0: number, f1: number, n = 14): Vec[] => {
+  const cum = [0];
+  for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y));
+  const total = cum[cum.length - 1] || 1;
+  const at = (f: number): Vec => {
+    const d = clamp(f, 0, 1) * total;
+    let i = 1;
+    while (i < cum.length - 1 && cum[i] < d) i++;
+    const k = (d - cum[i - 1]) / Math.max(1e-6, cum[i] - cum[i - 1]);
+    return lerpV(pts[i - 1], pts[i], clamp(k, 0, 1));
+  };
+  return Array.from({ length: n + 1 }, (_, i) => at(f0 + ((f1 - f0) * i) / n));
+};
+
+/** Closed outline of a tube along `pts` with width w(f), f in 0..1; round or flat ends. */
+const tubePath = (pts: Vec[], w: (f: number) => number, roundStart = true, roundEnd = true): string => {
+  const n = pts.length - 1;
+  const left: Vec[] = [];
+  const right: Vec[] = [];
+  const dirs: Vec[] = [];
+  for (let i = 0; i <= n; i++) {
+    const a = pts[Math.max(0, i - 1)];
+    const b = pts[Math.min(n, i + 1)];
+    const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    const d = { x: (b.x - a.x) / len, y: (b.y - a.y) / len };
+    dirs.push(d);
+    const h = w(i / n) / 2;
+    left.push({ x: pts[i].x - d.y * h, y: pts[i].y + d.x * h });
+    right.push({ x: pts[i].x + d.y * h, y: pts[i].y - d.x * h });
+  }
+  const cap = (from: Vec, to: Vec, dir: Vec, h: number) => {
+    const k = h * 1.33;
+    return `C${P({ x: from.x + dir.x * k, y: from.y + dir.y * k })} ${P({ x: to.x + dir.x * k, y: to.y + dir.y * k })} ${P(to)}`;
+  };
+  const hEnd = w(1) / 2;
+  const hStart = w(0) / 2;
+  const back = { x: -dirs[0].x, y: -dirs[0].y };
+  return (
+    `M${P(left[0])} ` + left.slice(1).map((q) => `L${P(q)}`).join(" ") + " " +
+    (roundEnd ? cap(left[n], right[n], dirs[n], hEnd) : `L${P(right[n])}`) + " " +
+    right.slice(0, n).reverse().map((q) => `L${P(q)}`).join(" ") + " " +
+    (roundStart ? cap(right[0], left[0], back, hStart) : `L${P(left[0])}`) + "Z"
+  );
+};
+
+const taper = (w0: number, w1: number, w2: number) => (f: number) =>
+  f < 0.5 ? w0 + (w1 - w0) * (f / 0.5) : w1 + (w2 - w1) * ((f - 0.5) / 0.5);
 
 /* ------------------------------- hands ----------------------------- */
 
@@ -127,28 +205,25 @@ const solveLeg = (side: "L" | "R", hipY: number, foot: Vec): Limb => {
 };
 
 const ArmShape: React.FC<{ l: Limb; cuff: boolean }> = ({ l, cuff }) => {
-  const d = limbPath(l);
-  const sl = along(l.a, l.mid, 0.6);
-  const c1 = along(l.mid, l.end, 0.66);
-  const c2 = along(l.mid, l.end, 0.86);
+  const pts = limbPoints(l);
+  const skin = tubePath(pts, taper(ARM_W, ARM_W - 2.5, ARM_W - 5));
+  const sleevePts = section(pts, 0, 0.3);
+  // Short sleeve: wide at the shoulder, a slight flare at the hem, wrapping the upper arm.
+  const sleeve = tubePath(sleevePts, (f) => 31 - 6 * f + (f > 0.85 ? (f - 0.85) * 20 : 0), true, false);
+  const sleeveShade = tubePath(section(pts, 0.05, 0.3), (f) => 12 - 4 * f, true, false);
+  const cuffPts = section(pts, 0.74, 0.84);
   return (
     <g>
-      <Stroked d={d} w={ARM_W} color={C.skin} />
+      <path d={skin} fill={C.skin} {...ink} />
+      <path d={tubePath(section(pts, 0.42, 0.62), () => 3.5)} fill={C.skinShade} opacity={0.35} />
       {cuff && (
         <>
-          <Stroked d={`M${P(c1)} L${P(c2)}`} w={ARM_W + 3} color={C.band} cap="butt" />
-          <circle cx={(c1.x + c2.x) / 2} cy={(c1.y + c2.y) / 2} r={2.6} fill={C.brass} stroke={C.ink} strokeWidth={1.4} />
+          <path d={tubePath(cuffPts, () => ARM_W - 1, false, false)} fill={C.band} {...ink} />
+          <circle cx={cuffPts[7].x} cy={cuffPts[7].y} r={2.4} fill={C.brass} stroke={C.ink} strokeWidth={1.2} />
         </>
       )}
-      <Stroked d={`M${P(l.a)} L${P(sl)}`} w={27} color={C.shirt} />
-      <path
-        d={`M${P(along(l.a, l.mid, 0.12))} L${P(sl)}`}
-        stroke={C.shirtShade}
-        strokeWidth={7}
-        strokeLinecap="round"
-        opacity={0.8}
-        transform="translate(3 2)"
-      />
+      <path d={sleeve} fill={C.shirt} {...ink} />
+      <path d={sleeveShade} fill={C.shirtShade} opacity={0.7} transform="translate(3 2)" />
     </g>
   );
 };
@@ -166,18 +241,21 @@ const Shoe: React.FC<{ at: Vec; mirror: boolean; lift: number }> = ({ at, mirror
 );
 
 const LegShape: React.FC<{ l: Limb }> = ({ l }) => {
-  const d = limbPath(l);
-  const s1 = along(l.mid, l.end, 0.62);
-  const tube = along(l.a, l.mid, 0.55);
+  const pts = limbPoints(l);
+  const skin = tubePath(pts, taper(LEG_W + 1, LEG_W - 3, LEG_W - 6), false, true);
+  const sock = tubePath(section(pts, 0.8, 1), () => LEG_W - 4.5, false, false);
+  const stripe = tubePath(section(pts, 0.84, 0.88), () => LEG_W - 4.5, false, false);
+  // Shorts leg: wraps the thigh and flares a little at the hem.
+  const shorts = tubePath(section(pts, 0, 0.3), (f) => 34 + f * 3, false, false);
+  const shortsShade = tubePath(section(pts, 0.14, 0.3), (f) => 14 + f * 2, false, false);
   return (
     <g>
-      <Stroked d={d} w={LEG_W} color={C.skin} />
-      {/* sock */}
-      <Stroked d={`M${P(s1)} L${P(l.end)}`} w={LEG_W + 2} color={C.sock} cap="butt" />
-      <path d={`M${P(along(l.mid, l.end, 0.7))} L${P(along(l.mid, l.end, 0.76))}`} stroke={C.scarf} strokeWidth={LEG_W + 2} />
-      {/* shorts leg */}
-      <Stroked d={`M${P(l.a)} L${P(tube)}`} w={33} color={C.shorts} cap="butt" />
-      <path d={`M${P(along(l.a, l.mid, 0.4))} L${P(tube)}`} stroke={C.shortsShade} strokeWidth={33} />
+      <path d={skin} fill={C.skin} {...ink} />
+      <path d={tubePath(section(pts, 0.38, 0.6), () => 4)} fill={C.skinShade} opacity={0.3} />
+      <path d={sock} fill={C.sock} {...ink} />
+      <path d={stripe} fill={C.scarf} />
+      <path d={shorts} fill={C.shorts} {...ink} />
+      <path d={shortsShade} fill={C.shortsShade} opacity={0.8} transform="translate(4 0)" />
     </g>
   );
 };
@@ -768,42 +846,51 @@ export const Arka: React.FC<ArkaProps> = ({
   const liftL = clamp((-12 - pose.footL.y) / 30, 0, 1);
   const liftR = clamp((-12 - pose.footR.y) / 30, 0, 1);
 
+  const body = (
+    <g transform={`translate(${pose.rootX.toFixed(2)} ${pose.rootY.toFixed(2)}) scale(${facing} 1) scale(${sx.toFixed(4)} ${sy.toFixed(4)})`}>
+      {/* back layer */}
+      <g transform={torsoT}>
+        <Scarf t={t} wind={pose.scarfWind} />
+        <g transform={`translate(0 ${packLag.toFixed(2)})`}>
+          <Backpack />
+        </g>
+      </g>
+      {/* legs */}
+      <LegShape l={legL} />
+      <LegShape l={legR} />
+      <Shoe at={legL.end} mirror={false} lift={liftL} />
+      <Shoe at={legR.end} mirror={true} lift={liftR} />
+      <Shorts hipY={hipY} />
+      {/* torso + arms + head */}
+      <g transform={torsoT}>
+        <Neck />
+        <Torso />
+        <ArmShape l={armL} cuff={true} />
+        <ArmShape l={armR} cuff={false} />
+        <ScarfWrap t={t} />
+        <g transform={`translate(0 ${(headY + lagY).toFixed(2)}) rotate(${(pose.headTilt + lagTilt).toFixed(2)}) scale(${HEAD_SCALE})`}>
+          <Head expr={expression} turn={pose.turn} uid={uid} blink={blink} t={t} />
+        </g>
+        {pose.prop === "map" && propS > 0.01 && scaled(along(armL.end, armR.end, 0.5), <MapProp hL={armL.end} hR={armR.end} />)}
+        {pose.prop === "spyglass" && propS > 0.01 && scaled(armR.end, <Spyglass eye={eyeTorso} hand={armR.end} />)}
+        {pose.prop === "compass" && propS > 0.01 && scaled(armR.end, <Compass at={armR.end} t={t} />)}
+        <Hand at={armL.end} angle={handAngle(armL)} shape={pose.handShapeL} mirror={false} />
+        <Hand at={armR.end} angle={handAngle(armR)} shape={pose.handShapeR} mirror={true} />
+      </g>
+    </g>
+  );
+
   return (
     <g>
       {shadow && (
         <ellipse cx={pose.rootX} cy={2} rx={78 * (1 - air * 0.6)} ry={11 * (1 - air * 0.5)} fill={C.ink} opacity={0.16 * (1 - air)} />
       )}
-      <g transform={`translate(${pose.rootX.toFixed(2)} ${pose.rootY.toFixed(2)}) scale(${facing} 1) scale(${sx.toFixed(4)} ${sy.toFixed(4)})`}>
-        {/* back layer */}
-        <g transform={torsoT}>
-          <Scarf t={t} wind={pose.scarfWind} />
-          <g transform={`translate(0 ${packLag.toFixed(2)})`}>
-            <Backpack />
-          </g>
-        </g>
-        {/* legs */}
-        <LegShape l={legL} />
-        <LegShape l={legR} />
-        <Shoe at={legL.end} mirror={false} lift={liftL} />
-        <Shoe at={legR.end} mirror={true} lift={liftR} />
-        <Shorts hipY={hipY} />
-        {/* torso + arms + head */}
-        <g transform={torsoT}>
-          <Neck />
-          <Torso />
-          <ArmShape l={armL} cuff={true} />
-          <ArmShape l={armR} cuff={false} />
-          <ScarfWrap t={t} />
-          <g transform={`translate(0 ${(headY + lagY).toFixed(2)}) rotate(${(pose.headTilt + lagTilt).toFixed(2)}) scale(${HEAD_SCALE})`}>
-            <Head expr={expression} turn={pose.turn} uid={uid} blink={blink} t={t} />
-          </g>
-          {pose.prop === "map" && propS > 0.01 && scaled(along(armL.end, armR.end, 0.5), <MapProp hL={armL.end} hR={armR.end} />)}
-          {pose.prop === "spyglass" && propS > 0.01 && scaled(armR.end, <Spyglass eye={eyeTorso} hand={armR.end} />)}
-          {pose.prop === "compass" && propS > 0.01 && scaled(armR.end, <Compass at={armR.end} t={t} />)}
-          <Hand at={armL.end} angle={handAngle(armL)} shape={pose.handShapeL} mirror={false} />
-          <Hand at={armR.end} angle={handAngle(armR)} shape={pose.handShapeR} mirror={true} />
-        </g>
-      </g>
+      {/* One bold silhouette around the whole figure (line-weight hierarchy): a solid ink copy
+          with a thick stroke drawn behind; the parts on top keep thin inner lines, so joints
+          read as folds instead of seams. Pure vector (an SVG filter was ~10x slower). */}
+      <style>{silhouetteCss(`${uid}-sil`, SIL)}</style>
+      <g className={`${uid}-sil`}>{body}</g>
+      {body}
     </g>
   );
 };

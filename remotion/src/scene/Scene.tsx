@@ -11,8 +11,9 @@ import { PropView } from "./bg/props";
 import { BackgroundLayer, LAYER_PARALLAX, type Layer } from "./Backgrounds";
 import { Captions } from "./Captions";
 import { actorAt, ActorState, cameraAt, CameraState, DEPTH_PARALLAX, H, W } from "./layout";
+import type { Speech } from "./acting";
 import { arkaFaceAt, arkaOverlap, arkaPoseAt, type ArkaCtx, blinkAt, lipaStateAt } from "./puppets";
-import { type Box, placeGraphic, type Placement } from "./placement";
+import { type Box, placeGraphic, type Placed, type Placement } from "./placement";
 import { SceneTransitions, transitionCameraBoost } from "./Transitions";
 
 const shotAt = (scene: PlanScene, f: number): PlanShot =>
@@ -76,7 +77,7 @@ const Actor: React.FC<{ a: ActorState; ctx: ArkaCtx; t: number; frame: number; m
     }}>
       <Portal strength={a.portal} width={a.height} />
       <svg viewBox={`${-LIPA_VB} ${-LIPA_VB} ${LIPA_VB * 2} ${LIPA_VB * 2}`} width={size} height={size} style={{ overflow: "visible" }}>
-        <Lipa pose={lipa.pose} expression={lipa.expression} t={secs + ctx.seed * 0.07} facing={facing} uid={uid}
+        <Lipa pose={lipa.pose} expression={lipa.expression} t={secs + ctx.seed * 0.07} facing={lipa.facing} uid={uid}
           flapTip={lipa.flapTip} bob={lipa.bob} />
       </svg>
     </div>
@@ -114,12 +115,15 @@ const characterBoxes = (actors: ActorState[], depths: PlanShot["blocking"][numbe
     const sy = (y: number) => (y - cy) * zoom + H / 2;
     if (a.character === "arka") {
       const w = a.height * 0.62;
-      return { x0: sx(a.x - w / 2), x1: sx(a.x + w / 2), y0: sy(a.y - a.height * 1.03), y1: sy(a.y) };
+      const body = { x0: sx(a.x - w / 2), x1: sx(a.x + w / 2), y0: sy(a.y - a.height * 1.03), y1: sy(a.y) };
+      // Face (under the hat brim) listed twice: it weighs double when placing panels.
+      const face = { x0: sx(a.x - w * 0.36), x1: sx(a.x + w * 0.36), y0: sy(a.y - a.height * 0.78), y1: sy(a.y - a.height * 0.5) };
+      return [body, face, face];
     }
     const r = a.height * 0.7;
     const c = a.y - a.height / 2;
-    return { x0: sx(a.x - r), x1: sx(a.x + r), y0: sy(c - r), y1: sy(c + r) };
-  });
+    return [{ x0: sx(a.x - r), x1: sx(a.x + r), y0: sy(c - r), y1: sy(c + r) }];
+  }).flat();
 
 export const Scene: React.FC<SceneProps> = ({ scene }) => {
   const frame = useCurrentFrame();
@@ -146,6 +150,35 @@ export const Scene: React.FC<SceneProps> = ({ scene }) => {
     }
     return out;
   })), [scene]);
+  // The line being spoken at shot frame tt (drives acting, listening and emotion faces).
+  const speechAt = (tt: number): Speech | null => {
+    const fr = shot.start_frame + tt;
+    const ln = scene.lines.find((l) => fr >= l.start_frame && fr < l.end_frame);
+    if (!ln) return null;
+    return {
+      speaker: ln.speaker, emotion: ln.emotion, lt: fr - ln.start_frame, len: ln.end_frame - ln.start_frame,
+      amp: (k: number) => ln.mouth[Math.max(0, Math.min(ln.mouth.length - 1, k))] ?? 0,
+    };
+  };
+  const partnerDirOf = (i: number) => {
+    const j = shot.blocking.findIndex((o, k) => k !== i && o.character !== shot.blocking[i].character);
+    if (j < 0) return 0;
+    return actors[j].x < actors[i].x ? -1 : 1;
+  };
+  // Lipa faces where she flies; hovering, she follows the storyboard or turns toward Arka.
+  const lipaFacing = (i: number) => (tt: number): 1 | -1 => {
+    const b = shot.blocking[i];
+    const t0 = Math.max(0, Math.min(len - 1, tt));
+    const a = actorAt(b, t0, len, seedOf(i));
+    const back = actorAt(b, Math.max(0, t0 - 4), len, seedOf(i));
+    const vx = (a.x - back.x) / 4;
+    if (Math.abs(vx) > 1.5) return vx > 0 ? 1 : -1;
+    if (b.facing === "left") return -1;
+    if (b.facing === "right") return 1;
+    const j = shot.blocking.findIndex((o) => o.character === "arka");
+    if (j >= 0) return actorAt(shot.blocking[j], t0, len, seedOf(j)).x < a.x ? -1 : 1;
+    return 1;
+  };
   const velOf = (i: number) => {
     const a = actorAt(shot.blocking[i], t, len, seedOf(i));
     const b = actorAt(shot.blocking[i], Math.max(0, t - 2), len, seedOf(i));
@@ -164,7 +197,15 @@ export const Scene: React.FC<SceneProps> = ({ scene }) => {
   const boxes = characterBoxes(actorsStart, shot.blocking.flatMap((b) => [b.depth, b.depth]), camStart)
     .filter((b) => b.x1 > 0 && b.x0 < W && b.y1 > 0 && b.y0 < H);
   let labelIndex = 0;
-  const places = scene.graphics.map((g) => placeGraphic(g.component, boxes, g.component === "Label" ? labelIndex++ : 0));
+  const places: Placed[] = [];
+  scene.graphics.forEach((g, gi) => {
+    // Panels on screen at the same time as this one are obstacles (never stack panels).
+    const busy = places.filter((_, k) => {
+      const o = scene.graphics[k];
+      return o.start_frame < g.end_frame && g.start_frame < o.end_frame;
+    }).map((pl) => pl.box);
+    places[gi] = placeGraphic(g.component, boxes, g.component === "Label" ? labelIndex++ : 0, 0.8, busy);
+  });
 
   const speaking = scene.lines.find((l) => frame >= l.start_frame && frame < l.end_frame);
   const mouthFor = (who: string) =>
@@ -191,6 +232,8 @@ export const Scene: React.FC<SceneProps> = ({ scene }) => {
           ctx={{
             b, len, fps, seed: seedOf(i), talking: speaking?.speaker === b.character,
             travel: travel[shotIndex]?.[i], vel: b.character === "lipa" ? velOf(i) : undefined,
+            facingAt: b.character === "lipa" ? lipaFacing(i) : undefined,
+            speechAt, partnerDir: partnerDirOf(i),
             prev: prevShot?.blocking.find((p) => p.character === b.character),
           }} />
       ))}

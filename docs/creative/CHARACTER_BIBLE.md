@@ -105,6 +105,15 @@ Refinements added 2026-11-05 at the owner's request ("polish more"):
 13. **Secondary motion.** The backpack trails vertical body motion a little more than the head.
 14. **Lipa pitches into her flight.** Nose down when dropping, nose up when climbing, and a faster wingbeat while climbing.
 
+Rig v3 refinements (2026-11-05, owner scorecard 3/5: "motion too limited, bodies look segmented, Lipa flips when facing left"):
+
+15. **One silhouette.** A bold outline is drawn once around the whole figure (a solid ink copy of the body with a thick round stroke, drawn behind it), and every part keeps only a thin inner line, so joints read as folds instead of separate pieces. Same for Lipa's origami.
+16. **Tapered limbs.** Arms and legs are filled shapes that taper from shoulder to wrist and thigh to ankle. Sleeves, shorts legs, socks and the wristband are sections of the same limb, so clothing wraps the limb.
+17. **Acting by emotion.** Each line's script emotion drives the performance (scene/acting.ts): excited and delighted (arms up, bounce), surprised (jolt back, hands up), curious (lean in, point), thoughtful (hand to chin, slow nods), puzzled (head scratch, tilt), determined (fist beats), playful (sway); neutral lines use alternating open-hand beats. Gestures pulse with the voice loudness and ease in and out of each line; the face blends toward the emotion while lip-sync continues. Storyboard poses with meaningful arms (map, spyglass, point) keep their arms and act through body and head.
+18. **Listening.** The character who is not speaking turns and looks toward the speaker and nods now and then.
+19. **Lipa acts too.** She bounces with her voice, her glow pulses on stressed syllables, wings beat faster when excited, she jolts up when surprised, tilts when puzzled, and drifts in a lazy figure-eight instead of hovering frozen (not when perched).
+20. **Lipa faces where she goes.** She faces her direction of travel; hovering, she follows the storyboard facing or turns toward Arka. Turns are smoothed over 8 frames, so she flips like folded paper. `loop` is an eased somersault every 4.5 s, never a held upside-down pose.
+
 ## Consistency rules
 1. Only rig IDs from `config/catalogue/rig_v2.yaml` exist. Unknown poses or expressions fail the storyboard check. Old rig v1 storyboards (`kai`/`needle`) still load and render through ID aliases.
 2. Colours come from `remotion/src/rig/palette.ts`. No per-episode recolouring.

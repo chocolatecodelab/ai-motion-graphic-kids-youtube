@@ -118,6 +118,10 @@ def test_timing_builds_frame_accurate_plan(tmp_path: Path, chain: dict) -> None:
     on_screen = " ".join(w.text for s in plan.scenes for c in s.captions
                          for line in c.lines for w in line)
     assert on_screen == " ".join(ln.text for ln in script.lines)
+    # Each line keeps its script emotion (it drives the characters' acting).
+    emotions = {ln.line_id: ln.emotion for ln in script.lines}
+    assert all(pl.emotion == emotions[pl.line_id] for s in plan.scenes for pl in s.lines)
+    assert any(pl.emotion != "neutral" for s in plan.scenes for pl in s.lines)
     for s in plan.scenes:
         for c in s.captions:
             assert 0 <= c.start_frame < c.end_frame <= s.duration_frames

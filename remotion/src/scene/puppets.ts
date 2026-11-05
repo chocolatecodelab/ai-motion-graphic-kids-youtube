@@ -27,6 +27,7 @@ import {
   type LipaPose,
 } from "../rig/lipa";
 import { POSE_FACE } from "../rig/presets";
+import { arkaFaceActing, arkaListening, arkaSpeaking, lipaActing, type Speech } from "./acting";
 import type { PlanBlocking } from "../types";
 
 export const POSE_EASE = Easing.bezier(0.34, 1.32, 0.64, 1);
@@ -68,7 +69,8 @@ export const arkaExpressionFor = (name: string, pose: string): ArkaExpression =>
 
 const lipaPoseFor = (name: string): LipaPose => {
   const id = (LIPA_POSE_ALIAS[name] ?? name) as keyof typeof LIPA_POSES;
-  const base = LIPA_POSES[id] ?? LIPA_POSES.float;
+  // "loop" is a motion (an eased somersault, see lipaStateAt), never a held upside-down pose.
+  const base = id === "loop" ? LIPA_POSES.flap : LIPA_POSES[id] ?? LIPA_POSES.float;
   return name === "glow" ? { ...base, glow: 1 } : base;
 };
 
@@ -168,6 +170,12 @@ export interface ArkaCtx {
   travel?: number[];
   /** Lipa: on-screen velocity in world px per frame. */
   vel?: { x: number; y: number };
+  /** Lipa: which way she should face at frame t (1 right, -1 left): travel, storyboard, partner. */
+  facingAt?: (t: number) => 1 | -1;
+  /** The line being spoken at shot frame t (any speaker), for acting and listening. */
+  speechAt?: (t: number) => Speech | null;
+  /** Direction of the other character on screen (-1 left, 1 right, 0 none). */
+  partnerDir?: number;
 }
 
 const sampleAt = (arr: number[], t: number) => arr[Math.max(0, Math.min(arr.length - 1, Math.round(t)))];
@@ -218,8 +226,13 @@ export const arkaPoseAt = (ctx: ArkaCtx, t: number): ArkaPose => {
     pose = { ...pose, rootX: pose.rootX + 1.6 * ws, lean: pose.lean + 0.7 * ws, headTilt: pose.headTilt + 0.8 * Math.sin(s * TAU * 0.17 + seed * 0.5) };
   }
 
-  // Talking: small beat gestures from the free hand and head, layered on any pose.
-  if (talking) {
+  // Acting: perform the current line by its emotion, or listen to the other character.
+  const sp = ctx.speechAt?.(t) ?? null;
+  if (sp) {
+    pose = sp.speaker === b.character
+      ? arkaSpeaking(pose, b.pose, sp, fps, seed)
+      : arkaListening(pose, sp, fps, seed, ctx.partnerDir ?? 0);
+  } else if (talking) {
     const g = Math.sin(s * TAU * 0.9 + seed);
     const g2 = Math.sin(s * TAU * 1.7 + seed * 1.3);
     pose = {
@@ -254,6 +267,8 @@ export const arkaFaceAt = (ctx: ArkaCtx, t: number, mouth: number): ArkaExpressi
     const look = Math.sin((t / ctx.fps) * TAU / 2.8);
     e = { ...e, eyeL: { ...e.eyeL, lookX: look }, eyeR: { ...e.eyeR, lookX: look } };
   }
+  const sp = ctx.speechAt?.(t) ?? null;
+  e = arkaFaceActing(e, sp, sp?.speaker === b.character, ctx.partnerDir ?? 0);
   if (ctx.talking) {
     // Lip-sync: the open mouth follows the voice amplitude curve; closed between syllables.
     e = { ...e, mouth: mouth > 0.06 ? "talk" : e.mouth === "talk" ? "smile" : e.mouth, mouthOpen: Math.min(1, mouth * 1.15) };
@@ -290,6 +305,7 @@ const withGlances = (e: ArkaExpression, s: number, seed: number): ArkaExpression
 /* ------------------------------ Lipa -------------------------------- */
 
 export interface LipaState {
+  facing: number; // -1..1, smoothed so turns read as a paper flip, not a pop
   pose: LipaPose;
   flapTip: number;
   bob: number;
@@ -304,19 +320,33 @@ export const lipaStateAt = (ctx: ArkaCtx, t: number, mouth: number): LipaState =
     pose = lerpLipa(lipaPoseFor(prev.pose), pose, POSE_EASE(clamp01(t / BLEND_FRAMES)));
   }
   const id = LIPA_POSE_ALIAS[b.pose] ?? b.pose;
+  const sp = ctx.speechAt?.(t) ?? null;
+  const acted = lipaActing(pose, lipaExpressionFor(b.expression), sp, sp?.speaker === b.character, fps, t,
+    (b.motion === "none" || b.motion === "float") && id !== "perch", seed);
+  pose = acted.pose;
   // Wingbeat strength by pose: perched/gliding wings mostly rest, flying wings beat fully.
   const strength = id === "perch" ? 0 : id === "glide" ? 0.18 : id === "dive" ? 0.35 : 1;
   const vy = ctx.vel?.y ?? 0;
   // Climbing beats faster; gliding down beats slower.
   const climb = Math.max(-0.3, Math.min(0.5, -vy * 0.035));
-  const rate = (b.pose === "zip" || b.motion === "zip" ? 3.6 : id === "flap" ? 3 : 2.4) * (1 + climb);
+  const rate = (b.pose === "zip" || b.motion === "zip" ? 3.6 : id === "flap" ? 3 : 2.4) * (1 + climb) * acted.rateMul;
   const fl = flightAt(s + seed * 0.37, rate, 1);
   const flap = pose.flap * (1 - strength) + fl.flap * strength;
   const flapTip = pose.flap * (1 - strength) + fl.flapTip * strength;
   // Pitch into the motion: nose down when dropping, nose up when climbing.
   pose = { ...pose, flap, rot: pose.rot + Math.max(-22, Math.min(22, vy * 1.3)) };
+  if (id === "loop") {
+    // A full somersault eased in and out, every 4.5 s, upright in between.
+    const period = Math.round(fps * 4.5);
+    const local = (((t - 6) % period) + period) % period;
+    pose = { ...pose, rot: pose.rot - 360 * smooth(local / (fps * 1.1)) };
+  }
+  // Facing: average the target over the last 8 frames -> a smooth turn through edge-on.
+  let facing = 0;
+  for (let k = 0; k < 8; k++) facing += ctx.facingAt ? ctx.facingAt(t - k) : 1;
+  facing /= 8;
 
-  let expression = lipaExpressionFor(b.expression);
+  let expression = acted.expression;
   const env = smooth(t / ACTION_IN);
   switch (b.action) {
     case "sparkle":
@@ -339,7 +369,7 @@ export const lipaStateAt = (ctx: ArkaCtx, t: number, mouth: number): LipaState =
       break;
   }
   if (talking) expression = { ...expression, beak: Math.max(expression.beak * 0.4, Math.min(1, mouth * 1.2)) };
-  return { pose, flapTip, bob: fl.bob * strength, expression };
+  return { facing, pose, flapTip, bob: fl.bob * strength, expression };
 };
 
 /** Natural blink: about every 3-4 s, offset per character, 4-frame close/open. */

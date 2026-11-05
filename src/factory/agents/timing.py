@@ -44,6 +44,7 @@ from factory.schemas.renderplan import (
     RenderPlan,
     SfxCue,
 )
+from factory.schemas.script import Script
 from factory.schemas.storyboard import Storyboard, StoryboardScene
 from factory.schemas.visual import AssetManifest, VisualPlan
 from factory.schemas.voice import Cue, Subtitles, VoiceManifest
@@ -114,7 +115,9 @@ def _frames(value: float) -> int:
 
 
 def build_scene(scene: StoryboardScene, voice: dict[str, Any], tin: PlanTransition,
-                tout: PlanTransition, cdir: Path) -> tuple[PlanScene, dict[str, int]]:
+                tout: PlanTransition, cdir: Path,
+                emotions: dict[str, str] | None = None) -> tuple[PlanScene, dict[str, int]]:
+    emotions = emotions or {}
     t = max(LEAD_IN_S, tin.frames / FPS + 0.15)
     lines: list[PlanLine] = []
     captions: list[PlanCaption] = []
@@ -125,7 +128,8 @@ def build_scene(scene: StoryboardScene, voice: dict[str, Any], tin: PlanTransiti
             raise PermanentStageError(f"no voice for {lid}")
         start = _frames(t * FPS)
         frames = max(1, _frames(v.duration_s * FPS))
-        lines.append(PlanLine(line_id=lid, speaker=v.speaker, text=v.text, emotion="neutral",
+        lines.append(PlanLine(line_id=lid, speaker=v.speaker, text=v.text,
+                              emotion=emotions.get(lid, "neutral"),
                               start_frame=start, end_frame=start + frames,
                               mouth=mouth_curve(cdir / v.file, frames)))
         words = []
@@ -262,13 +266,13 @@ def audio_plan(board: Storyboard, scenes: list[PlanScene], scene_starts: list[in
 class TimingStage(Stage):
     name = "timing"
     lane = Lane.MEDIA
-    version = "4"  # v4: set-dressing props; v3: SFX + music; v2: word timings + captions
-    depends_on = ("storyboard", "voice", "subtitles", "visual_plan", "assets")
+    version = "5"  # v5: line emotions from the script; v4: props; v3: SFX + music
+    depends_on = ("script", "storyboard", "voice", "subtitles", "visual_plan", "assets")
     max_attempts = 1
 
     def input_payload(self, ctx: StageContext) -> Mapping[str, Any]:
         return {k: ctx.upstream[k]["sha256"]
-                for k in ("storyboard", "voice", "subtitles", "visual_plan", "assets")}
+                for k in ("script", "storyboard", "voice", "subtitles", "visual_plan", "assets")}
 
     def run(self, ctx: StageContext) -> StageResult:
         board = load_upstream(ctx, "storyboard", Storyboard)
@@ -280,11 +284,13 @@ class TimingStage(Stage):
                 f"v{board.script_version}; re-run voice")
         cdir = content_dir(ctx)
         voice = {v.line_id: v for v in manifest.lines}
+        script = load_upstream(ctx, "script", Script)
+        emotions = {ln.line_id: ln.emotion for ln in script.lines}
 
         scenes, starts_all, scene_starts = [], {}, []
         offset = 0
         for scene, (tin, tout) in zip(board.scenes, transitions(board), strict=True):
-            plan, starts = build_scene(scene, voice, tin, tout, cdir)
+            plan, starts = build_scene(scene, voice, tin, tout, cdir, emotions)
             scenes.append(plan)
             scene_starts.append(offset)
             starts_all.update({lid: offset + f for lid, f in starts.items()})

@@ -197,3 +197,16 @@ The owner heard the +3 st rubberband voice as robotic, flat and too fast. Causes
 ## 2026-11-05: Episode length: long-form main episodes are 5-8 minutes
 
 The owner confirmed the brief target: main ("Main Quest") episodes run **5-8 minutes** (300-480 s of spoken audio). The 2-3 minute M1 pilot was a pipeline-testing length only. Rationale (docs/research/market-research.md): room for the Question → Adventure → Discovery arc without rushing, competitor norms for this age (3-15 min), and more watch time per view; retention (a strong hook, a new visual or question every 20-40 s) matters more than raw length. A 5-8 minute script needs about 12-15 verified claims; the pilot brief gained three (C10 white clouds, C11 grey cloud bases, C12 paler horizon), each with two or more tier-1 sources (Met Office, Hong Kong Observatory, NOAA NWS, NASA Space Place). "Space looks black" was left out: only one tier-1 source states it.
+## 2026-11-05: Rig v3: silhouette outline, tapered limbs, acting by emotion (owner scorecard 3/5)
+
+| Topic | Decision |
+|---|---|
+| Feedback | Pilot 1 scored 3/5: motion too limited, bodies look segmented ("putus-putus"), Lipa looks flipped when facing left |
+| Bugs found | Timing hard-coded every line''s emotion to `neutral`, so no line was ever performed by emotion (timing v5 now reads emotions from the script). Lipa''s `loop` pose was held at -140° (upside down, pointing left) and she never turned to her direction of travel |
+| Line weight | Bold silhouette around the whole figure + thin inner lines for both characters. Implemented as a vector pass: a solid ink copy of the body with a thick round stroke (CSS `!important` over the shapes' attributes) drawn behind it. An SVG `feMorphology` filter gave the same look but cost ~10 s per frame in headless Chrome (hours per episode); the vector pass costs ~40% extra render time |
+| Shapes | Arka''s limbs are tapered filled shapes along the filleted IK centreline; sleeves/shorts/socks/cuffs are sections of it |
+| Acting | `remotion/src/scene/acting.ts`: per-emotion gesture sets pulsed by voice loudness, emotion faces, listening reactions, Lipa voice bounce/glow/drift; Lipa facing from travel/storyboard/partner with smoothed turns |
+| Review | Owner re-scores the re-rendered pilot (target ≥ 4/5) before new topics |
+## 2026-11-05: Pilot 1 passes the owner scorecard (≥ 4/5)
+
+After rig v3 (silhouette outline, tapered limbs, acting by emotion, listening, Lipa facing/loop fixes) and the framing/placement fixes, the owner re-scored pilot 1 "Why Is the Sky Blue?" (6:11, script v7) at **4/5 or better** (previous: 3/5). M2 exit criterion progress: 1 of 3 full-length pilots passed.

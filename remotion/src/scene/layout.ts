@@ -66,7 +66,8 @@ export const actorAt = (b: PlanBlocking, t: number, shotLen: number, seed: numbe
     }
     case "shrink": scale *= interpolate(progress, [0, 1], [1, 0.35], { ...clamp, easing: ease }); break;
     case "grow": scale *= interpolate(progress, [0, 1], [1, 1.6], { ...clamp, easing: ease }); break;
-    case "spin": rotate = interpolate(progress, [0, 1], [0, 360], clamp); break;
+    // One eased spin at the start of the shot (a continuous spin left characters upside down).
+    case "spin": rotate = interpolate(t, [4, 40], [0, 360], { ...clamp, easing: ease }); break;
     case "bounce": {
       const s = Math.abs(Math.sin((t + seed) / 6));
       y -= s * 26;
@@ -185,6 +186,16 @@ export const cameraAt = (shot: PlanShot, t: number, actorsNow: ActorState[], act
     case "birds_eye": cy -= 0.15 * H / zoom; break;
     case "tilted": rotate += 7; break;
     default: break;
+  }
+
+  // Last step, after moves and angles: medium and wider shots never crop a head (Arka's hat
+  // included, with headroom for hops). Close-ups frame the face, so a cropped hat is fine there.
+  const framesHeads = !["close_up", "extreme_close_up", "insert"].includes(shot.shot_type);
+  if (framesHeads && subjects.length && shot.focus !== "graphic" && shot.focus !== "background") {
+    const tallest = Math.max(...subjects.map((a) => a.height));
+    const tops = subjects.map((a) => a.y - a.height * (a.character === "arka" ? 1.04 : 1.0));
+    const maxCy = Math.min(...tops) - 0.12 * tallest + (H / 2 - 0.035 * H) / zoom;
+    if (cy > maxCy) cy = maxCy;
   }
   return { zoom, cx, cy, rotate };
 };

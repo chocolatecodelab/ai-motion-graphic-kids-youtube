@@ -1,6 +1,7 @@
 import React from "react";
 import { C } from "./palette";
 import { lerp, sparklePath, rand } from "./math";
+import { silhouetteCss } from "./Arka";
 
 /* ------------------------------------------------------------------ */
 /*  LIPA — origami map-bird companion (rig.v1)                         */
@@ -100,7 +101,8 @@ export const flightAt = (t: number, rate = 2.4, strength = 1) => {
 
 /* ------------------------------ drawing ---------------------------- */
 
-const SW = 2.8;
+const SW = 2.0; // inner fold lines (the silhouette pass draws the bold outer outline)
+const SIL = 2.6;
 const ink = { stroke: C.ink, strokeWidth: SW, strokeLinejoin: "round" as const, strokeLinecap: "round" as const };
 const poly = (pts: number[][]) => "M" + pts.map((p) => p.join(" ")).join(" L") + "Z";
 
@@ -192,7 +194,8 @@ export type LipaProps = {
   expression: LipaExpression;
   t?: number;
   uid?: string;
-  facing?: 1 | -1;
+  /** 1 right, -1 left; values in between are a turn in progress (paper seen edge-on). */
+  facing?: number;
   trail?: boolean;
   /** Lagged wing-tip flap (see flightAt); defaults to pose.flap (rigid wing). */
   flapTip?: number;
@@ -215,8 +218,51 @@ export const Lipa: React.FC<LipaProps> = ({
   const beakA = e.beak * 24;
   const hover = Math.sin(t * 3.2) * 2;
   const tip = flapTip ?? pose.flap;
+  const body = (
+    <g transform={`rotate(${pose.rot.toFixed(2)}) scale(${sx.toFixed(4)} ${sy.toFixed(4)})`}>
+      {/* back wing */}
+      <g transform="translate(9 -3)">
+        <Wing flap={pose.flap * 0.92} tip={tip * 0.92} back t={t} clipId={`${uid}-wb`} />
+      </g>
+      {/* tail */}
+      <path d={poly([[-28, -4], [-76, -30], [-54, -2]])} fill={C.paper} {...ink} />
+      <path d={poly([[-28, -4], [-54, -2], [-72, 16], [-24, 8]])} fill={C.paperMid} {...ink} />
+      {/* body */}
+      <path d={poly([[-32, -2], [-2, -20], [30, -12]])} fill={C.paper} {...ink} />
+      <path d={poly([[-32, -2], [30, -12], [12, 16], [-20, 12]])} fill={C.paperMid} {...ink} />
+      <path d="M-20 4 L8 0" stroke={C.paperLine} strokeWidth={1.3} strokeDasharray="2 3" />
+      {/* head */}
+      <g transform="translate(30 -12) scale(1.3) translate(-30 12)">
+      <path d={poly([[22, -10], [30, -42], [50, -48], [62, -30], [52, -6]])} fill={C.paper} {...ink} />
+      <path d={poly([[30, -42], [50, -48], [62, -30], [42, -32]])} fill="#FBF0D6" stroke={C.paperLine} strokeWidth={1.2} strokeLinejoin="round" />
+      <path d={poly([[22, -10], [30, -42], [50, -48], [62, -30], [52, -6]])} fill="none" {...ink} />
+      {/* beak */}
+      <g transform={`rotate(${(-beakA * 0.35).toFixed(2)} 60 -26)`}>
+        <path d={poly([[59, -34], [75, -28], [60, -25]])} fill={C.brass} {...ink} strokeWidth={2.2} />
+      </g>
+      <g transform={`rotate(${beakA.toFixed(2)} 60 -25)`}>
+        <path d={poly([[60, -25], [72, -24], [58, -19]])} fill={C.brassDark} {...ink} strokeWidth={2.2} />
+      </g>
+      {/* face */}
+      <ellipse cx={38} cy={-17} rx={4.2} ry={2.4} fill={C.blush} opacity={e.blush} />
+      <ellipse cx={55} cy={-17} rx={3.2} ry={2.2} fill={C.blush} opacity={e.blush} />
+      <Eye x={40} y={-27} kind={e.eyeL} r={4.4} look={e.lookX} />
+      <Eye x={53} y={-28} kind={e.eyeR} r={3.8} look={e.lookX} />
+      {e.brows !== "none" && (
+        <g stroke={C.ink} strokeWidth={2.4} strokeLinecap="round">
+          {e.brows === "angry" && <path d="M35 -37 L44 -34 M49 -35 L57 -38" />}
+          {e.brows === "worried" && <path d="M35 -34 L44 -38 M49 -38 L57 -35" />}
+          {e.brows === "raised" && <path d="M35 -38 Q40 -41 45 -38 M49 -39 Q53 -42 57 -39" fill="none" />}
+        </g>
+      )}
+      </g>
+      {/* front wing */}
+      <Wing flap={pose.flap} tip={tip} t={t} clipId={`${uid}-wf`} />
+    </g>
+  );
+
   return (
-    <g transform={`translate(${pose.x.toFixed(2)} ${(pose.y + hover + bob).toFixed(2)}) scale(${facing} 1)`}>
+    <g transform={`translate(${pose.x.toFixed(2)} ${(pose.y + hover + bob).toFixed(2)}) scale(${(Math.sign(facing || 1) * Math.max(0.06, Math.abs(facing))).toFixed(3)} 1)`}>
       <defs>
         <radialGradient id={`${uid}-glow`}>
           <stop offset="0" stopColor={C.glow} stopOpacity={0.85} />
@@ -239,46 +285,9 @@ export const Lipa: React.FC<LipaProps> = ({
             />
           );
         })}
-      <g transform={`rotate(${pose.rot.toFixed(2)}) scale(${sx.toFixed(4)} ${sy.toFixed(4)})`}>
-        {/* back wing */}
-        <g transform="translate(9 -3)">
-          <Wing flap={pose.flap * 0.92} tip={tip * 0.92} back t={t} clipId={`${uid}-wb`} />
-        </g>
-        {/* tail */}
-        <path d={poly([[-28, -4], [-76, -30], [-54, -2]])} fill={C.paper} {...ink} />
-        <path d={poly([[-28, -4], [-54, -2], [-72, 16], [-24, 8]])} fill={C.paperMid} {...ink} />
-        {/* body */}
-        <path d={poly([[-32, -2], [-2, -20], [30, -12]])} fill={C.paper} {...ink} />
-        <path d={poly([[-32, -2], [30, -12], [12, 16], [-20, 12]])} fill={C.paperMid} {...ink} />
-        <path d="M-20 4 L8 0" stroke={C.paperLine} strokeWidth={1.3} strokeDasharray="2 3" />
-        {/* head */}
-        <g transform="translate(30 -12) scale(1.3) translate(-30 12)">
-        <path d={poly([[22, -10], [30, -42], [50, -48], [62, -30], [52, -6]])} fill={C.paper} {...ink} />
-        <path d={poly([[30, -42], [50, -48], [62, -30], [42, -32]])} fill="#FBF0D6" stroke={C.paperLine} strokeWidth={1.2} strokeLinejoin="round" />
-        <path d={poly([[22, -10], [30, -42], [50, -48], [62, -30], [52, -6]])} fill="none" {...ink} />
-        {/* beak */}
-        <g transform={`rotate(${(-beakA * 0.35).toFixed(2)} 60 -26)`}>
-          <path d={poly([[59, -34], [75, -28], [60, -25]])} fill={C.brass} {...ink} strokeWidth={2.2} />
-        </g>
-        <g transform={`rotate(${beakA.toFixed(2)} 60 -25)`}>
-          <path d={poly([[60, -25], [72, -24], [58, -19]])} fill={C.brassDark} {...ink} strokeWidth={2.2} />
-        </g>
-        {/* face */}
-        <ellipse cx={38} cy={-17} rx={4.2} ry={2.4} fill={C.blush} opacity={e.blush} />
-        <ellipse cx={55} cy={-17} rx={3.2} ry={2.2} fill={C.blush} opacity={e.blush} />
-        <Eye x={40} y={-27} kind={e.eyeL} r={4.4} look={e.lookX} />
-        <Eye x={53} y={-28} kind={e.eyeR} r={3.8} look={e.lookX} />
-        {e.brows !== "none" && (
-          <g stroke={C.ink} strokeWidth={2.4} strokeLinecap="round">
-            {e.brows === "angry" && <path d="M35 -37 L44 -34 M49 -35 L57 -38" />}
-            {e.brows === "worried" && <path d="M35 -34 L44 -38 M49 -38 L57 -35" />}
-            {e.brows === "raised" && <path d="M35 -38 Q40 -41 45 -38 M49 -39 Q53 -42 57 -39" fill="none" />}
-          </g>
-        )}
-        </g>
-        {/* front wing */}
-        <Wing flap={pose.flap} tip={tip} t={t} clipId={`${uid}-wf`} />
-      </g>
+      <style>{silhouetteCss(`${uid}-sil`, SIL)}</style>
+      <g className={`${uid}-sil`}>{body}</g>
+      {body}
       {e.extra === "sparkle" && (
         <g>
           <path d={sparklePath(8 + Math.sin(t * 6) * 2)} transform="translate(72 -60)" fill={C.glow} stroke={C.ink} strokeWidth={1.6} strokeLinejoin="round" />
