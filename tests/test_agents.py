@@ -67,8 +67,8 @@ def script_model(draft: dict | None = None) -> Script:
 
 
 def test_real_pilot_brief_is_valid(tmp_path: Path) -> None:
-    ref = run_brief(tmp_path, min_s=120, max_s=180)
-    assert ref["claims"] == 9 and ref["path"].endswith("brief.v1.json")
+    ref = run_brief(tmp_path, min_s=300, max_s=480)
+    assert ref["claims"] == 12 and ref["path"].endswith("brief.v1.json")
 
 
 def test_brief_rejects_single_source_key_claim(tmp_path: Path) -> None:
@@ -410,3 +410,51 @@ def test_end_to_end_with_approval_gate(tmp_path: Path) -> None:
 
     with scope() as s, pytest.raises(ValueError, match="already has episode"):
         create_episode_from_brief(s, brief, settings, wf)
+
+
+def test_owner_revise_sends_script_back_with_notes(tmp_path: Path) -> None:
+    from factory.db.models import ApprovalDecision
+    from factory.services import revise_stage
+
+    engine = create_engine(f"sqlite+pysqlite:///{(tmp_path / 'rev.db').as_posix()}")
+    Base.metadata.create_all(engine)
+    maker = sessionmaker(bind=engine, expire_on_commit=False)
+
+    @contextmanager
+    def scope() -> Iterator[Session]:
+        s = maker()
+        try:
+            yield s
+            s.commit()
+        except Exception:
+            s.rollback()
+            raise
+        finally:
+            s.close()
+
+    settings = Settings(content_dir=tmp_path / "content", library_dir=tmp_path / "library",
+                        publication_mode=PublicationMode.APPROVAL_REQUIRED)
+    llm = FakeLLM(responder=responder)
+    wf = build_workflow(llm)
+    with scope() as s:
+        ep_id = create_episode_from_brief(s, write_brief(tmp_path / "brief.yaml"), settings, wf).id
+    worker = Worker(Lane.LLM, wf, scope, settings, worker_id="t")
+    worker.run_until_idle()
+    with scope() as s:
+        ep = s.get(Episode, ep_id)
+        path = revise_stage(s, ep, "script_validate", wf, settings, "owner",
+                            "Apply the reviewer's fixes.")
+        with pytest.raises(ValueError, match="cannot be revised"):
+            revise_stage(s, ep, "voice", wf, settings, "owner", "x")
+    assert path.name == "script.v1.md" and "Apply the reviewer's fixes." in path.read_text(
+        encoding="utf-8")
+    with scope() as s:
+        jobs = {j.stage: j.status for j in s.scalars(select(ProductionJob))}
+        assert jobs["script"] is JobStatus.QUEUED and jobs["script_validate"] is JobStatus.PENDING
+        assert s.scalars(select(Approval)).one().decision is ApprovalDecision.REJECTED
+    n = len(llm.requests)
+    worker.run_until_idle()  # the writer rewrites with the owner's notes, then review again
+    assert "Apply the reviewer's fixes." in llm.requests[n].prompt
+    with scope() as s:
+        jobs = {j.stage: j.status for j in s.scalars(select(ProductionJob))}
+        assert jobs["script_validate"] is JobStatus.AWAITING_APPROVAL

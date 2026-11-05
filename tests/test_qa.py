@@ -159,3 +159,24 @@ def test_seeded_unverified_claim_and_missing_font_licence(tmp_path: Path) -> Non
     assert font_check.severity == "critical" and "Mystery-Regular.ttf" in font_check.detail
     bad_voice = rights_checks(manifest.model_copy(update={"licence": "CC-BY-NC-4.0"}), fonts)
     assert next(r for r in bad_voice if r.id == "rights.voice").severity == "critical"
+
+
+def test_rights_checks_cover_generated_props_and_procedural_audio(tmp_path: Path) -> None:
+    from types import SimpleNamespace
+
+    from factory.agents.qa import audio_rights_check, visuals_check
+    from factory.assetlib import AssetLibrary, sanitize_svg
+    from helpers import GOOD_SVG
+
+    lib = AssetLibrary(tmp_path)
+    rec = lib.add("glass prism", [], sanitize_svg(GOOD_SVG)[0], "fake:m", "p", "ep")
+    prop = SimpleNamespace(kind="svg", ref=rec.asset_id)
+    plan = SimpleNamespace(scenes=[SimpleNamespace(props=[prop])], music=[1], sfx=[1, 2])
+    assert visuals_check(plan, lib).severity == "info"
+    prop.ref = "unknown-asset"
+    assert visuals_check(plan, lib).severity == "critical"
+    assert audio_rights_check(plan, {"audio_source": "procedural (synth), original"}).severity \
+        == "info"
+    assert audio_rights_check(plan, {}).severity == "critical"
+    empty = SimpleNamespace(scenes=[], music=[], sfx=[])
+    assert audio_rights_check(empty, {}).severity == "info"

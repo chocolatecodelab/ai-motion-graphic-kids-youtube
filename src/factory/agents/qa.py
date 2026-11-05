@@ -17,6 +17,7 @@ from typing import Any
 
 from factory.agents.common import content_dir, load_upstream, save
 from factory.artifacts import write_text
+from factory.assetlib import AssetLibrary
 from factory.db.models import Lane
 from factory.media.stt import WhisperTranscriber, WordTranscriber
 from factory.pipeline import PermanentStageError, Stage, StageContext, StageResult
@@ -43,7 +44,9 @@ def content_checks(script: Script, brief: TopicBrief) -> list[C.Check]:
                    "script")]
 
 
-def rights_checks(manifest: VoiceManifest, fonts_dir: Path = FONTS_DIR) -> list[C.Check]:
+def rights_checks(manifest: VoiceManifest, fonts_dir: Path = FONTS_DIR,
+                  plan: RenderPlan | None = None, assembled: dict | None = None,
+                  library: AssetLibrary | None = None) -> list[C.Check]:
     out = []
     out.append(C.ok("rights.voice", "rights", f"{manifest.engine} {manifest.model} "
                     f"({manifest.licence}), stock voices, no cloning")
@@ -58,10 +61,40 @@ def rights_checks(manifest: VoiceManifest, fonts_dir: Path = FONTS_DIR) -> list[
     out.append(C.ok("rights.fonts", "rights", "every font ships with its licence file")
                if not missing else
                C.fail("rights.fonts", "rights", f"fonts without licence file: {missing}", None))
-    out.append(C.ok("rights.visuals", "rights",
-                    "visuals are drawn in code by the project (owned); no third-party images"))
-    out.append(C.ok("rights.music", "rights", "no music or SFX in this cut"))
+    out.append(visuals_check(plan, library))
+    out.append(audio_rights_check(plan, assembled or {}))
     return out
+
+
+def visuals_check(plan: RenderPlan | None, library: AssetLibrary | None) -> C.Check:
+    """Everything is drawn in code; generated SVG props must carry provenance + an owned licence."""
+    scenes = plan.scenes if plan else []
+    refs = sorted({p.ref for s in scenes for p in s.props if p.kind == "svg"})
+    if not refs:
+        return C.ok("rights.visuals", "rights",
+                    "visuals are drawn in code by the project (owned); no third-party images")
+    if library is None:
+        return C.warn("rights.visuals", "rights", f"{len(refs)} generated props, provenance not "
+                      f"checked (no library)", "assets")
+    bad = [r for r in refs if not ((rec := library.get(r)) and rec.licence.startswith("original")
+                                   and rec.generator)]
+    return (C.ok("rights.visuals", "rights", f"visuals drawn in code + {len(refs)} generated SVG "
+                 f"props with provenance (original, owned)")
+            if not bad else
+            C.fail("rights.visuals", "rights", f"props without provenance/licence: {bad}",
+                   "assets"))
+
+
+def audio_rights_check(plan: RenderPlan | None, assembled: dict) -> C.Check:
+    has_beds = bool(plan and (plan.music or plan.sfx))
+    source = str(assembled.get("audio_source", ""))
+    if not has_beds:
+        return C.ok("rights.music", "rights", "no music or SFX in this cut")
+    if source.startswith("procedural"):
+        return C.ok("rights.music", "rights", f"music bed + {len(plan.sfx) if plan else 0} SFX: "
+                    f"{source}")
+    return C.fail("rights.music", "rights", "music/SFX present but their source is unknown",
+                  "assemble")
 
 
 def score(results: list[C.Check]) -> int:
@@ -148,7 +181,8 @@ class QAStage(Stage):
             results.append(C.fail("subtitles.present", "subtitles", "no subtitle file",
                                   "timing"))
         results += content_checks(script, brief)
-        results += rights_checks(manifest)
+        results += rights_checks(manifest, plan=plan, assembled=assembled,
+                                 library=AssetLibrary(Path(ctx.settings.library_dir)))
 
         sc = score(results)
         critical = [f"{r.id}: {r.detail}" for r in results if r.severity == "critical"]

@@ -12,12 +12,15 @@ learning_objectives:
   - Sunlight looks white but is a mix of all the colours of the rainbow.
   - Tiny air molecules scatter short-wavelength blue light much more than red light.
   - At sunset light travels through more air, so even more blue is scattered away and reds and oranges reach our eyes.
+  - Clouds look white because their big water droplets scatter all colours about equally.
 storytelling_angle: >-
   Arka notices the sky outside the attic window and wonders why it is not purple or green.
   Lipa lights up the Discovery Compass to shrink them down so they can ride a sunbeam into the air
-  and watch what happens to each colour when it bumps into air molecules.
+  and watch what happens to each colour when it bumps into air molecules. On the way they fly
+  through a cloud (why isn't it blue too, and why is its bottom grey?), look along the paler
+  horizon, then time-jump to sunset before the Mars twist.
 twist: On Mars the daytime sky is orange-red, and sunsets there look blue-grey.
-duration: {min_s: 120, max_s: 180}
+duration: {min_s: 300, max_s: 480}  # owner: long-form main episodes are 5-8 min (2026-11-05)
 verification: manual
 sources:
   - id: SRC01
@@ -38,6 +41,18 @@ sources:
     publisher: NOAA National Weather Service, Flagstaff
     tier: 1
     retrieved_at: 2026-11-04
+  - id: SRC04
+    url: https://weather.metoffice.gov.uk/learn-about/weather/types-of-weather/clouds/why-are-clouds-white
+    title: Why are clouds white?
+    publisher: Met Office (UK)
+    tier: 1
+    retrieved_at: 2026-11-05
+  - id: SRC05
+    url: https://www.hko.gov.hk/en/education/earth-science/optical-phenomena/00349-colours-of-clouds.html
+    title: Colours of Clouds
+    publisher: Hong Kong Observatory
+    tier: 1
+    retrieved_at: 2026-11-05
 claims:
   - id: C01
     text: Sunlight looks white, but it is really made of all the colours of the rainbow.
@@ -117,3 +132,28 @@ claims:
     evidence:
       - {source_id: SRC01, quote: "During the daytime, the Martian sky takes on an orange or reddish color."}
       - {source_id: SRC01, quote: "the sky around the Sun begins to take on a blue-gray tone."}
+  - id: C10
+    text: Clouds look white because their water droplets are much bigger than air molecules and scatter all colours about equally, so the light stays white.
+    category: scientific
+    status: supported
+    confidence: 0.93
+    evidence:
+      - {source_id: SRC04, quote: "Bigger particles like water droplets within a cloud scatter all wavelengths with roughly the same effectiveness."}
+      - {source_id: SRC05, quote: "so all visible wavelengths are scattered about equally by such particles"}
+  - id: C11
+    text: The bottom of a thick cloud looks grey because less sunlight reaches it.
+    category: scientific
+    status: supported
+    confidence: 0.9
+    evidence:
+      - {source_id: SRC04, quote: "Cloud bases are often grey as a result of the same scattering that makes them white."}
+      - {source_id: SRC05, quote: "Since little sunlight reaches the underside of the cloud, less light is scattered, and the cloud base appears grey."}
+  - id: C12
+    text: Near the horizon the sky looks paler, because that light has crossed more air and been scattered again and again, mixing in more white.
+    category: scientific
+    status: supported
+    confidence: 0.9
+    evidence:
+      - {source_id: SRC03, quote: "As you look at the horizon, the sky appears much paler in color."}
+      - {source_id: SRC02, quote: "The increased scattering mixes in more white light, making the blue less intense."}
+      - {source_id: SRC01, quote: "Closer to the horizon, the sky fades to a lighter blue or white."}

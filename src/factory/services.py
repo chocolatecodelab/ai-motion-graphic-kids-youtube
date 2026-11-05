@@ -19,6 +19,8 @@ from factory.db.models import (
     Channel,
     ContentTopic,
     Episode,
+    JobStatus,
+    ProductionJob,
     Project,
     TopicStatus,
 )
@@ -105,6 +107,44 @@ def find_episode(s: Session, ref: str) -> Episode:
     if len(found) > 1:
         raise LookupError(f"{ref!r} matches {len(found)} episodes; use the slug")
     return found[0]
+
+
+# Approval gate -> the stage that rewrites its input when the owner asks for changes.
+REVISION_TARGET = {"script_validate": "script"}
+
+
+def revise_stage(
+    s: Session, episode: Episode, stage: str, workflow: Workflow, settings: Settings,
+    decided_by: str, notes: str, include_review: bool = True,
+) -> Path:
+    """Owner sends a gated stage back with notes: the target stage rewrites using the notes
+    (and the reviewer's findings), then the gate is reviewed again. Returns the feedback file."""
+    target = REVISION_TARGET.get(stage)
+    if target is None:
+        raise ValueError(f"stage {stage!r} cannot be revised from its gate "
+                         f"(supported: {sorted(REVISION_TARGET)})")
+    job = s.scalar(select(ProductionJob).where(ProductionJob.episode_id == episode.id,
+                                               ProductionJob.stage == stage))
+    if job is None or job.status != JobStatus.AWAITING_APPROVAL:
+        raise ValueError(f"stage {stage!r} of {episode.slug} is not awaiting approval")
+    ep_dir = Path(settings.content_dir) / episode.storage_prefix
+    text = f"# Owner revision request ({decided_by})\n\n{notes.strip()}\n"
+    reviews = sorted((ep_dir / stage).glob("review.v*.md"),
+                     key=lambda p: int(p.stem.rsplit(".v", 1)[1]))
+    if include_review and reviews:
+        text += ("\n## The reviewer's findings (apply the ones the owner asks for)\n\n"
+                 + reviews[-1].read_text(encoding="utf-8"))
+    fb_dir = ep_dir / "inputs" / "feedback"
+    fb_dir.mkdir(parents=True, exist_ok=True)
+    n = 1 + max((int(p.stem.rsplit(".v", 1)[1]) for p in fb_dir.glob(f"{target}.v*.md")
+                 if p.stem.rsplit(".v", 1)[1].isdigit()), default=0)
+    path = fb_dir / f"{target}.v{n}.md"
+    path.write_text(text, encoding="utf-8")
+    s.add(Approval(episode_id=episode.id, gate=GATE_FOR_STAGE.get(stage, ApprovalGate.FINAL),
+                   decision=ApprovalDecision.REJECTED, decided_by=decided_by, notes=notes))
+    queue.retry_stage(s, episode.id, target, workflow)
+    s.flush()
+    return path
 
 
 def approve_stage(

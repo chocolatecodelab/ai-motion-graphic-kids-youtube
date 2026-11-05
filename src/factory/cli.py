@@ -224,6 +224,29 @@ def approve(
 
 
 @app.command()
+def revise(
+    episode: str,
+    stage: str = typer.Argument("script_validate"),
+    notes: str = typer.Option(..., help="What to change (sent to the writer with the review)"),
+    by: str = typer.Option(None, help="Reviewer name (default: OS user)"),
+    with_review: bool = typer.Option(True, help="Also send the reviewer's findings"),
+) -> None:
+    """Send a stage awaiting approval back with notes (e.g. apply the reviewer's fixes)."""
+    from factory.services import find_episode, revise_stage
+
+    with session_scope() as s:
+        ep = find_episode(s, episode)
+        try:
+            path = revise_stage(s, ep, stage, _workflow(), get_settings(),
+                                by or getpass.getuser(), notes, include_review=with_review)
+        except ValueError as exc:
+            console.print(f"[red]{exc}[/]")
+            raise typer.Exit(1) from exc
+    console.print(f"Revision requested for {ep.slug} ({path.name}). Run: "
+                  f"[cyan]uv run factory run-episode --episode {ep.slug}[/]")
+
+
+@app.command()
 def retry(episode: str, stage: str) -> None:
     """Re-run one stage; downstream stages re-run after it, upstream results are reused."""
     from factory.pipeline import queue
