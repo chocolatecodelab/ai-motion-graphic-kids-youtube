@@ -1,5 +1,5 @@
 // One storyboard scene, rendered from its renderplan.v1 entry.
-import React from "react";
+import React, { useMemo } from "react";
 import { AbsoluteFill, useCurrentFrame, useVideoConfig } from "remotion";
 import { C } from "../brand";
 import { GraphicView } from "../graphics/Graphics";
@@ -113,7 +113,27 @@ export const Scene: React.FC<SceneProps> = ({ scene }) => {
 
   const seedOf = (i: number) => i * 17 + scene.scene_id.length;
   const actors = shot.blocking.map((b, i) => actorAt(b, t, len, seedOf(i)));
-  const prevShot = scene.shots[scene.shots.indexOf(shot) - 1];
+  const shotIndex = scene.shots.indexOf(shot);
+  const prevShot = scene.shots[shotIndex - 1];
+  // Distance Arka walks along his facing, per frame, in rig units: drives a stride-synced gait.
+  const travel = useMemo(() => scene.shots.map((sh) => sh.blocking.map((b, i) => {
+    if (b.character !== "arka" || (b.motion !== "walk" && b.motion !== "run")) return undefined;
+    const n = Math.max(1, sh.end_frame - sh.start_frame);
+    const dir = b.facing === "left" ? -1 : 1;
+    const out = [0];
+    let last = actorAt(b, 0, n, i * 17 + scene.scene_id.length);
+    for (let f = 1; f < n; f++) {
+      const cur = actorAt(b, f, n, i * 17 + scene.scene_id.length);
+      out.push(out[f - 1] + ((cur.x - last.x) * dir) / (Math.max(cur.height, 1) / ARKA_UNITS));
+      last = cur;
+    }
+    return out;
+  })), [scene]);
+  const velOf = (i: number) => {
+    const a = actorAt(shot.blocking[i], t, len, seedOf(i));
+    const b = actorAt(shot.blocking[i], Math.max(0, t - 2), len, seedOf(i));
+    return { x: (a.x - b.x) / 2, y: (a.y - b.y) / 2 };
+  };
   // Camera framing reference: where characters stand (start and end of their paths),
   // ignoring entrances/exits and motion wobble, so a static camera frames the action.
   const rest = (b: PlanShot["blocking"][number]) => ({ ...b, enter: "none" as const, exit: "none" as const, motion: "none" as const });
@@ -144,6 +164,7 @@ export const Scene: React.FC<SceneProps> = ({ scene }) => {
         <Actor key={b.character} a={actors[i]} t={t} frame={frame} mouth={mouthFor(b.character)}
           ctx={{
             b, len, fps, seed: seedOf(i), talking: speaking?.speaker === b.character,
+            travel: travel[shotIndex]?.[i], vel: b.character === "lipa" ? velOf(i) : undefined,
             prev: prevShot?.blocking.find((p) => p.character === b.character),
           }} />
       ))}

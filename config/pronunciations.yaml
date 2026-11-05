@@ -1,5 +1,7 @@
 # Pronunciation overrides for Kokoro (misaki phonemes, American English).
 # Only add a word after listening confirms Kokoro gets it wrong. Kokoro already says
-# "Kai" as /kˈI/ and "Rayleigh" as /ɹˈAli/ correctly (checked 2026-11-04).
+# "Arka" as /ˈɑɹkə/ (AR-kuh) and "Rayleigh" as /ɹˈAli/ correctly (checked 2026-11-05).
 # Diphthongs: A = "ay" (day), I = "eye", O = "oh", W = "ow", Y = "oy".
-words: {}
+words:
+  # Kokoro stresses the second syllable (/lipˈɑ/, "lee-PAH"); the name is "LEE-puh".
+  Lipa: lˈipə

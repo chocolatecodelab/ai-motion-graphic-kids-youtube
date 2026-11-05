@@ -13,9 +13,11 @@ import {
   type ArkaExpression,
   type ArkaPose,
   type ArkaPoseName,
+  lerpExpression,
   lerpPose,
   walkPose,
 } from "../rig/arkaData";
+import { rand } from "../rig/math";
 import {
   flightAt,
   lerpLipa,
@@ -162,7 +164,16 @@ export interface ArkaCtx {
   fps: number;
   seed: number;
   talking: boolean;
+  /** Arka: cumulative distance walked along his facing, in rig units, per shot frame. */
+  travel?: number[];
+  /** Lipa: on-screen velocity in world px per frame. */
+  vel?: { x: number; y: number };
 }
+
+const sampleAt = (arr: number[], t: number) => arr[Math.max(0, Math.min(arr.length - 1, Math.round(t)))];
+
+// Gait constants: step length (rig units) and the cadence used for walking in place.
+const GAIT = { walk: { step: 40, frames: 18, stride: 1 }, run: { step: 60, frames: 11, stride: 1.3 } } as const;
 
 /** Arka's body pose at shot-relative frame t. */
 export const arkaPoseAt = (ctx: ArkaCtx, t: number): ArkaPose => {
@@ -175,8 +186,17 @@ export const arkaPoseAt = (ctx: ArkaCtx, t: number): ArkaPose => {
 
   if (b.motion === "walk" || b.motion === "run") {
     const run = b.motion === "run";
-    const w = walkPose(t / (run ? 11 : 18), run ? 1.3 : 1);
+    const g = run ? GAIT.run : GAIT.walk;
+    const tr = ctx.travel;
+    const moving = tr !== undefined && Math.abs(tr[tr.length - 1] - tr[0]) > 30;
+    // Moving along a path: the step phase follows the distance covered, so planted feet never
+    // slide, and the gait fades in/out with the path's own ease (start, stop).
+    const dist = moving ? sampleAt(tr, t) : 0;
+    const speed = moving ? Math.abs(sampleAt(tr, t + 2) - sampleAt(tr, t - 2)) / 4 : 0;
+    const weight = moving ? smooth(speed / ((2 * g.step) / g.frames * 0.55)) : 1;
+    const w = moving ? walkPose(dist / (2 * g.step), g.stride, g.step) : walkPose(t / g.frames, g.stride);
     const busy = ARMS_BUSY.has(b.pose);
+    const stand = pose;
     pose = {
       ...w,
       lean: w.lean + (run ? 5 : 0),
@@ -188,6 +208,7 @@ export const arkaPoseAt = (ctx: ArkaCtx, t: number): ArkaPose => {
       propScale: pose.propScale,
       headTilt: w.headTilt + pose.headTilt * 0.5,
     };
+    if (weight < 0.999) pose = lerpPose(stand, pose, weight);
   } else if (b.motion === "jump" || b.motion === "bounce") {
     const period = b.motion === "jump" ? 26 : 18;
     pose = hop(pose, (((t + seed) % period) + period) % period / period);
@@ -217,12 +238,17 @@ export const arkaOverlap = (ctx: ArkaCtx, t: number) => {
   const now = arkaPoseAt(ctx, t);
   const back2 = arkaPoseAt(ctx, t - 2);
   const back3 = arkaPoseAt(ctx, t - 3);
-  return { y: (now.rootY - back2.rootY) * 0.6, tilt: (back3.lean - now.lean) * 0.7 };
+  // The head (and backpack) keep where the body was a moment ago: delayed displacement.
+  return { y: (back2.rootY - now.rootY) * 0.6, tilt: (back3.lean - now.lean) * 0.7 };
 };
 
 export const arkaFaceAt = (ctx: ArkaCtx, t: number, mouth: number): ArkaExpression => {
-  const { b } = ctx;
+  const { b, prev } = ctx;
   let e = arkaExpressionFor(b.expression, b.pose);
+  if (prev && prev.expression !== b.expression) {
+    e = lerpExpression(arkaExpressionFor(prev.expression, prev.pose), e, smooth(t / 8));
+  }
+  if (!FIXED_GAZE.has(b.pose) && b.action !== "look_around") e = withGlances(e, t / ctx.fps, ctx.seed);
   if (b.action === "gasp") e = { ...ARKA_EXPRESSIONS.surprised };
   if (b.action === "look_around") {
     const look = Math.sin((t / ctx.fps) * TAU / 2.8);
@@ -233,6 +259,32 @@ export const arkaFaceAt = (ctx: ArkaCtx, t: number, mouth: number): ArkaExpressi
     e = { ...e, mouth: mouth > 0.06 ? "talk" : e.mouth === "talk" ? "smile" : e.mouth, mouthOpen: Math.min(1, mouth * 1.15) };
   }
   return e;
+};
+
+// Poses whose gaze is the point of the pose (map, compass, sky) keep their eyes still.
+const FIXED_GAZE = new Set(["hold_map", "hold_compass", "look_up", "look_out", "think"]);
+
+/**
+ * Small eye glances (saccades): every 1.6-2.8 s the eyes shift slightly and hold, moving over
+ * about 4 frames. Real eyes never stare perfectly still, so this keeps faces alive.
+ */
+const glanceAt = (s: number, seed: number) => {
+  const segLen = (n: number) => 1.6 + 1.2 * rand(n * 3 + seed);
+  let start = 0;
+  let n = 0;
+  while (start + segLen(n) <= s && n < 400) start += segLen(n++);
+  const target = (i: number) => (i <= 0 ? { x: 0, y: 0 } : { x: (rand(i * 7 + seed) - 0.5) * 0.55, y: (rand(i * 11 + seed) - 0.5) * 0.3 });
+  const k = smooth((s - start) / 0.13);
+  const a = target(n - 1);
+  const b = target(n);
+  return { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k };
+};
+
+const withGlances = (e: ArkaExpression, s: number, seed: number): ArkaExpression => {
+  const g = glanceAt(s, seed);
+  const eye = (st: ArkaExpression["eyeL"]) =>
+    st.shape === "open" ? { ...st, lookX: Math.max(-1, Math.min(1, st.lookX + g.x)), lookY: Math.max(-1, Math.min(1, st.lookY + g.y)) } : st;
+  return { ...e, eyeL: eye(e.eyeL), eyeR: eye(e.eyeR) };
 };
 
 /* ------------------------------ Lipa -------------------------------- */
@@ -254,11 +306,15 @@ export const lipaStateAt = (ctx: ArkaCtx, t: number, mouth: number): LipaState =
   const id = LIPA_POSE_ALIAS[b.pose] ?? b.pose;
   // Wingbeat strength by pose: perched/gliding wings mostly rest, flying wings beat fully.
   const strength = id === "perch" ? 0 : id === "glide" ? 0.18 : id === "dive" ? 0.35 : 1;
-  const rate = b.pose === "zip" || b.motion === "zip" ? 3.6 : id === "flap" ? 3 : 2.4;
+  const vy = ctx.vel?.y ?? 0;
+  // Climbing beats faster; gliding down beats slower.
+  const climb = Math.max(-0.3, Math.min(0.5, -vy * 0.035));
+  const rate = (b.pose === "zip" || b.motion === "zip" ? 3.6 : id === "flap" ? 3 : 2.4) * (1 + climb);
   const fl = flightAt(s + seed * 0.37, rate, 1);
   const flap = pose.flap * (1 - strength) + fl.flap * strength;
   const flapTip = pose.flap * (1 - strength) + fl.flapTip * strength;
-  pose = { ...pose, flap };
+  // Pitch into the motion: nose down when dropping, nose up when climbing.
+  pose = { ...pose, flap, rot: pose.rot + Math.max(-22, Math.min(22, vy * 1.3)) };
 
   let expression = lipaExpressionFor(b.expression);
   const env = smooth(t / ACTION_IN);

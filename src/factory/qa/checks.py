@@ -111,6 +111,18 @@ def scan(video: Path, black_min_s: float = 0.5, freeze_min_s: float = 2.0,
     return Scan(black, freeze, silence)
 
 
+def silences(audio: Path, noise_db: float = -45, min_s: float = 0.6) -> list[tuple[float, float]]:
+    """silencedetect on an audio file (the voice-only stem: music would mask dropouts)."""
+    import soundfile as sf
+
+    proc = ffmpeg.run(["-i", str(audio), "-af", f"silencedetect=noise={noise_db}dB:d={min_s}",
+                       "-f", "null", "-"])
+    ss = [float(x) for x in re.findall(r"silence_start: (-?[\d.]+)", proc.stderr)]
+    se = [float(x) for x in re.findall(r"silence_end: ([\d.]+)", proc.stderr)]
+    duration = float(sf.info(str(audio)).duration)
+    return [(max(0.0, s), se[i] if i < len(se) else duration) for i, s in enumerate(ss)]
+
+
 def check_black(s: Scan) -> Check:
     if not s.black:
         return ok("video.black_frames", "video", "no black segments")
@@ -130,13 +142,13 @@ def check_freeze(s: Scan) -> Check:
                 segments=s.freeze)
 
 
-def check_silence(s: Scan, speech: list[tuple[float, float]],
-                  long_gap_s: float = 2.5) -> list[Check]:
-    """Silence inside a voice line = dropout (critical). Long gaps between lines = warning
-    (no music bed yet)."""
+def check_silence(s: Scan, speech: list[tuple[float, float]], long_gap_s: float = 2.5,
+                  voice_silence: list[tuple[float, float]] | None = None) -> list[Check]:
+    """Silence inside a voice line = dropout (critical), judged on the voice stem when there is
+    one. Long silent gaps in the final mix = warning (the music bed should fill them)."""
     out: list[Check] = []
     dropouts = []
-    for a, b in s.silence:
+    for a, b in (s.silence if voice_silence is None else voice_silence):
         for la, lb in speech:
             overlap = min(b, lb - 0.15) - max(a, la + 0.15)  # ignore natural edges
             if overlap > 0.35:
@@ -149,7 +161,8 @@ def check_silence(s: Scan, speech: list[tuple[float, float]],
     out.append(ok("audio.long_gaps", "audio", f"no silent gap over {long_gap_s}s")
                if not long_gaps else
                warn("audio.long_gaps", "audio", f"{len(long_gaps)} silent gap(s) over "
-                    f"{long_gap_s}s (music bed not mixed yet)", "assemble", segments=long_gaps))
+                    f"{long_gap_s}s in the final mix (check the music bed)", "assemble",
+                    segments=long_gaps))
     return out
 
 

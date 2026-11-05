@@ -57,10 +57,22 @@ class Settings(BaseSettings):
 
     # Voices chosen by the owner in the 2026-11-04 bake-off (DECISIONS.md).
     tts_provider: str = "kokoro"
-    tts_hero_voice: str = "af_heart"      # Arka
+    tts_hero_voice: str = "am_echo"  # Arka (boy voice via tts_hero_* style below)
     tts_hero_speed: float = Field(default=1.0, gt=0.5, lt=2.0)
     tts_companion_voice: str = "af_sky"   # Lipa
     tts_companion_speed: float = Field(default=1.1, gt=0.5, lt=2.0)
+    # Legacy rubberband pitch shift in semitones (0 = off; superseded by the Praat styles below).
+    tts_hero_pitch: float = Field(default=0.0, ge=-12, le=12)
+    tts_companion_pitch: float = Field(default=0.0, ge=-12, le=12)
+    # Expressive voices (factory.media.voicefx, DECISIONS 2026-11-05): per-line emotion
+    # profiles, sentence pauses, and Praat PSOLA character styles. Arka = a 10-year-old boy.
+    tts_expressive: bool = True
+    tts_hero_pitch_hz: float = Field(default=235.0, ge=0, le=500)  # 0 = keep Kokoro pitch
+    tts_hero_formant: float = Field(default=1.12, ge=0.8, le=1.3)
+    tts_hero_range: float = Field(default=1.5, ge=0.5, le=2.5)
+    tts_companion_pitch_hz: float = Field(default=0.0, ge=0, le=500)
+    tts_companion_formant: float = Field(default=1.0, ge=0.8, le=1.3)
+    tts_companion_range: float = Field(default=1.15, ge=0.5, le=2.5)
 
     # --- budgets (USD; soft = notify, hard = pause queue). Marginal cost is ~$0 on the
     # free-first stack; these guard any paid adapter that gets switched on.

@@ -36,7 +36,7 @@ export const RigCheck: React.FC = () => {
   const { pose, name } = morphAt(frame);
   const back2 = morphAt(frame - 2).pose;
   const back3 = morphAt(frame - 3).pose;
-  const overlap = { y: (pose.rootY - back2.rootY) * 0.6, tilt: (back3.lean - pose.lean) * 0.7 };
+  const overlap = { y: (back2.rootY - pose.rootY) * 0.6, tilt: (back3.lean - pose.lean) * 0.7 };
   const fl = flightAt(t, 2.4);
   // Lip-sync stand-in: a syllable-like amplitude curve.
   const amp = Math.max(0, Math.sin(t * 9.1) * 0.6 + Math.sin(t * 4.3) * 0.4);

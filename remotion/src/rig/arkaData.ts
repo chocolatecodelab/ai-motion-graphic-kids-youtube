@@ -89,7 +89,8 @@ const BASE: ArkaPose = {
 const p = (o: Partial<ArkaPose>): ArkaPose => ({ ...BASE, ...o });
 
 export const ARKA_POSES = {
-  idle: p({}),
+  // Relaxed contrapposto: weight on one leg, knees soft (never locked straight), tiny hip roll.
+  idle: p({ crouch: 2.5, lean: 0.8, footL: { x: -19, y: -12 }, footR: { x: 25, y: -12 }, headTilt: -1 }),
   talk: p({
     handR: { x: 68, y: -58 },
     handShapeR: "open",
@@ -362,8 +363,15 @@ export const lerpPose = (a: ArkaPose, b: ArkaPose, k: number): ArkaPose => ({
  * - hips shift over the stance foot, a small squash on contact, steady forward lean;
  * - arms counter-swing smoothly against the legs; the head counter-rolls the torso.
  */
-export const walkPose = (phase: number, stride = 1): ArkaPose => {
-  const a = phase * Math.PI * 2;
+export const walkPose = (phase: number, stride = 1, travel = 0): ArkaPose => {
+  const p = phase - Math.floor(phase);
+  const a = p * Math.PI * 2;
+  // Foot travel (rig units per step): the stance foot slides back at exactly body speed, so it
+  // stays planted on the ground while the character moves; the swing foot eases forward.
+  const footTravel = (q: number) =>
+    q < 0.5 ? -travel / 2 + travel * smooth(q / 0.5) : travel / 2 - travel * ((q - 0.5) / 0.5);
+  const tL = footTravel(p);
+  const tR = footTravel((p + 0.5) % 1);
   const s = Math.sin(a);
   const liftL = s > 0 ? s * s : 0;
   const liftR = s < 0 ? s * s : 0;
@@ -377,10 +385,39 @@ export const walkPose = (phase: number, stride = 1): ArkaPose => {
     squash: 0.022 * Math.cos(2 * a) * stride,
     lean: 2.5 + 1.4 * s * stride,
     headTilt: 1 - 1.2 * s * stride,
-    footL: { x: -21 + 4 * Math.cos(a), y: -12 - 30 * liftL * stride },
-    footR: { x: 21 - 4 * Math.cos(a), y: -12 - 30 * liftR * stride },
+    // Feet live in root space, which the hip sway (rootX) shifts: subtract it so feet stay put.
+    footL: { x: -21 + 4 * Math.cos(a) + tL - 2.6 * s * stride, y: -12 - 30 * liftL * stride },
+    footR: { x: 21 - 4 * Math.cos(a) + tR - 2.6 * s * stride, y: -12 - 30 * liftR * stride },
     handL: { x: -51 + 7 * armFwdL * stride, y: -18 - 15 * armFwdL * stride },
     handR: { x: 51 + 7 * armFwdR * stride, y: -18 - 15 * armFwdR * stride },
     scarfWind: 1.05,
   };
 };
+
+/* ------------------------- expression blending ------------------------- */
+
+const lerpEye = (a: EyeState, b: EyeState, k: number): EyeState => {
+  // A shape swap (open <-> happy/closed/star) hides behind a quick blink at the midpoint.
+  const swap = a.shape !== b.shape;
+  const lid = swap ? Math.abs(2 * k - 1) : 1;
+  return {
+    shape: k < 0.5 ? a.shape : b.shape,
+    open: lerp(a.open, b.open, k) * lid,
+    iris: lerp(a.iris, b.iris, k),
+    lookX: lerp(a.lookX, b.lookX, k),
+    lookY: lerp(a.lookY, b.lookY, k),
+    lower: lerp(a.lower, b.lower, k),
+  };
+};
+
+/** Blend two expressions: eyes, brows, blush and mouth opening move; enums switch at k = 0.5. */
+export const lerpExpression = (a: ArkaExpression, b: ArkaExpression, k: number): ArkaExpression => ({
+  eyeL: lerpEye(a.eyeL, b.eyeL, k),
+  eyeR: lerpEye(a.eyeR, b.eyeR, k),
+  browL: { y: lerp(a.browL.y, b.browL.y, k), rot: lerp(a.browL.rot, b.browL.rot, k) },
+  browR: { y: lerp(a.browR.y, b.browR.y, k), rot: lerp(a.browR.rot, b.browR.rot, k) },
+  mouth: k < 0.5 ? a.mouth : b.mouth,
+  mouthOpen: lerp(a.mouthOpen, b.mouthOpen, k),
+  blush: lerp(a.blush, b.blush, k),
+  extra: k < 0.5 ? a.extra : b.extra,
+});

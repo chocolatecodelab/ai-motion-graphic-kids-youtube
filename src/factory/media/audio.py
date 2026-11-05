@@ -67,3 +67,42 @@ def load_16k_mono(path: Path) -> np.ndarray:
         capture_output=True, check=True,
     ).stdout
     return np.frombuffer(raw, dtype=np.float32).copy()
+
+
+def pitch_shift(audio: np.ndarray, sample_rate: int, semitones: float) -> np.ndarray:
+    """Raise/lower pitch without changing duration (ffmpeg rubberband, formants follow the
+    pitch so a shifted voice also sounds like a smaller vocal tract). Same length out."""
+    if not semitones or audio.size == 0:
+        return audio
+    exe = shutil.which("ffmpeg")
+    if exe is None:
+        raise RuntimeError("ffmpeg not found on PATH")
+    ratio = 2 ** (semitones / 12)
+    raw = subprocess.run(
+        [exe, "-v", "error", "-f", "f32le", "-ar", str(sample_rate), "-ac", "1", "-i", "-",
+         "-af", f"rubberband=pitch={ratio:.6f}:formant=shifted", "-f", "f32le", "-"],
+        input=audio.astype(np.float32).tobytes(), capture_output=True, check=True,
+    ).stdout
+    out = np.frombuffer(raw, dtype=np.float32).copy()
+    if out.size >= audio.size:
+        return out[: audio.size]
+    return np.concatenate([out, np.zeros(audio.size - out.size, dtype=np.float32)])
+
+def trim_silence(audio: np.ndarray, sample_rate: int, threshold_dbfs: float = -45.0,
+                 pad_s: float = 0.06) -> tuple[np.ndarray, float]:
+    """Trim leading/trailing silence (keeping a short natural pad). Returns (audio, lead_s):
+    lead_s is how much was cut from the start, so word timestamps can be shifted."""
+    if audio.size == 0:
+        return audio, 0.0
+    win = max(1, int(0.01 * sample_rate))
+    frames = audio.size // win
+    if frames == 0:
+        return audio, 0.0
+    level = np.sqrt(np.mean(audio[: frames * win].reshape(frames, win) ** 2, axis=1))
+    loud = np.nonzero(level > 10 ** (threshold_dbfs / 20))[0]
+    if loud.size == 0:
+        return audio, 0.0
+    pad = int(pad_s * sample_rate)
+    start = max(0, loud[0] * win - pad)
+    end = min(audio.size, (loud[-1] + 1) * win + pad)
+    return audio[start:end], start / sample_rate

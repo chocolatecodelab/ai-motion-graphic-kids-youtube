@@ -1,6 +1,7 @@
 import React from "react";
 import { CalculateMetadataFunction, Composition, Still } from "remotion";
 import { fontsReady } from "./brand";
+import { BackgroundSheet, BG_SHEET_H, BG_SHEET_W } from "./BackgroundSheet";
 import { CharacterSheet, SHEET_H, SHEET_W } from "./CharacterSheet";
 import { RIG_CHECK_FRAMES, RigCheck } from "./RigCheck";
 import { Scene } from "./scene/Scene";
@@ -26,6 +27,7 @@ export const RemotionRoot: React.FC = () => (
       calculateMetadata={calculateMetadata}
     />
     <Still id="CharacterSheet" component={CharacterSheet} width={SHEET_W} height={SHEET_H} />
+    <Still id="BackgroundSheet" component={BackgroundSheet} width={BG_SHEET_W} height={BG_SHEET_H} />
     <Composition id="RigCheck" component={RigCheck} durationInFrames={RIG_CHECK_FRAMES} fps={30} width={1920} height={1080} />
   </>
 );

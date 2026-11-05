@@ -113,6 +113,12 @@ def test_timing_builds_frame_accurate_plan(tmp_path: Path, chain: dict) -> None:
             assert 0 <= c.start_frame < c.end_frame <= s.duration_frames
     srt = (tmp_path / "content" / out["srt"]).read_text(encoding="utf-8")
     assert srt.startswith("1\n")
+    # Audio plan: one music section per scene (mood from the beat), SFX on the timeline,
+    # and a portal whoosh for the compass_portal transition after scene 3.
+    assert [m.scene_id for m in plan.music] == [s.scene_id for s in plan.scenes]
+    assert all(m.mood in {"curious", "adventure", "wonder", "mystery", "warm"} for m in plan.music)
+    assert all(0 <= c.start_s < plan.total_frames / plan.fps for c in plan.sfx)
+    assert any(c.id == "transition_compass_portal" and c.family == "portal" for c in plan.sfx)
 
 
 def test_mouth_curve_tracks_loudness(tmp_path: Path) -> None:
@@ -144,6 +150,8 @@ def test_render_and_assemble_episode(tmp_path: Path, chain: dict) -> None:
     assert info["vcodec"] == "h264" and info["acodec"] == "aac"
     assert abs(out["loudness_lufs"] - (-14)) <= 1.0
     assert out["srt"].endswith("en.srt") and (tmp_path / "content" / out["srt"]).exists()
+    assert out["music"] and (tmp_path / "content" / out["voice_stem"]).exists()
+    assert out["audio_source"].startswith("procedural")
 
 
 class PlanWords:
@@ -203,3 +211,12 @@ def test_render_rejects_wrong_duration(tmp_path: Path, chain: dict) -> None:
     with pytest.raises(PermanentStageError, match="expected"):
         stage.run(ctx(tmp_path, "render_scenes", chain))
     assert not list((tmp_path / "library" / "cache" / "render").glob("*.mp4"))
+
+
+def test_theme_keywords_cover_scene_library() -> None:
+    assert theme_for("a coral reef with little fish") == "underwater"
+    assert theme_for("a campsite under a moonlit sky") == "night"
+    assert theme_for("labels on old boxes in the attic") == "attic"  # "labels" is not a lab
+    assert theme_for("a laboratory with bubbling beakers") == "lab"
+    assert theme_for("sandy dunes and a cactus") == "desert"
+    assert theme_for("a seasonal market") == "studio"  # "seasonal" is not the sea

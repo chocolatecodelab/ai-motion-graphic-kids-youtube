@@ -7,6 +7,8 @@
 - Mouth curves come from each line's audio loudness per frame (puppet lip-flap).
 - Transitions: scene N's `transition_out` covers its last frames and reveals scene N+1.
 - Subtitles from the vo_preview timeline are shifted onto the final episode timeline.
+- Audio plan (v3): storyboard SFX land just before their trigger line, portal/whip/zoom
+  transitions get their own whoosh, and each scene gets a music mood from its beat.
 """
 
 from __future__ import annotations
@@ -24,9 +26,11 @@ from factory.artifacts import write_text
 from factory.captions import chunk_line
 from factory.db.models import Lane
 from factory.media import audio as A
+from factory.media.synth import BEAT_MOOD, sfx_family
 from factory.pipeline import PermanentStageError, Stage, StageContext, StageResult
 from factory.schemas.renderplan import (
     AudioCue,
+    MusicSection,
     PlanBlocking,
     PlanCaption,
     PlanGraphic,
@@ -37,6 +41,7 @@ from factory.schemas.renderplan import (
     PlanWaypoint,
     PlanWord,
     RenderPlan,
+    SfxCue,
 )
 from factory.schemas.storyboard import Storyboard, StoryboardScene
 from factory.schemas.voice import Cue, Subtitles, VoiceManifest
@@ -52,12 +57,25 @@ FIRST_TRANSITION_FRAMES = 12
 # indoor places first, because attic descriptions often mention sunbeams or the sky.
 THEME_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
     ("mars", ("mars", "martian")),
+    ("underwater", ("underwater", "under the sea", "seabed", "seafloor", "coral", "reef")),
     ("workbench", ("workbench", "bench", "tools")),
     ("attic", ("attic", "shelf", "shelves", "boxes")),
+    ("lab", ("laboratory", "lab bench", "beaker", "microscope", "test tube")),
+    ("library", ("library", "bookshelf", "bookshelves")),
+    ("cave", ("cave", "cavern", "stalactite", "crystal")),
+    ("volcano", ("volcano", "lava", "magma")),
+    ("arctic", ("arctic", "antarctic", "polar", "igloo", "glacier", "snowfield")),
+    ("night", ("campfire", "campsite", "moonlit", "night sky")),
     ("sunset", ("sunset", "sunrise", "dusk", "evening sky")),
     ("air", ("molecule", "air", "dots", "haze", "particles")),
     ("sunbeam", ("sunbeam", "beam", "rainbow", "ribbon", "spectrum", "light corridor")),
     ("space", ("space", "stars", "planet", "orbit")),
+    ("jungle", ("jungle", "rainforest", "vines")),
+    ("forest", ("forest", "woods", "woodland")),
+    ("desert", ("desert", "dune", "cactus")),
+    ("ocean", ("ocean", "beach", "seaside", "shore", "waves")),
+    ("mountains", ("mountain", "summit", "cliff")),
+    ("city", ("city", "street", "town", "skyline")),
     ("sky", ("sky", "cloud", "hilltop", "rooftop", "outdoor")),
 ]
 
@@ -187,10 +205,38 @@ def transitions(board: Storyboard) -> list[tuple[PlanTransition, PlanTransition]
     return out
 
 
+SFX_LEAD_S = 0.08
+TRANSITION_SFX = {"compass_portal": ("portal", 0.6), "whip": ("whoosh", 0.3),
+                  "zoom_through": ("riser", 0.5), "wipe": ("whoosh", 0.3)}
+
+
+def audio_plan(board: Storyboard, scenes: list[PlanScene], scene_starts: list[int],
+               line_starts: dict[str, int]) -> tuple[list[SfxCue], list[MusicSection]]:
+    sfx: list[SfxCue] = []
+    music: list[MusicSection] = []
+    for i, (scene, plan, s0) in enumerate(zip(board.scenes, scenes, scene_starts, strict=True)):
+        for fx in scene.sfx:
+            f = line_starts.get(fx.at_line) if fx.at_line else None
+            t = f / FPS - SFX_LEAD_S if f is not None else s0 / FPS + 0.3
+            sfx.append(SfxCue(id=fx.id, family=sfx_family(fx.id), scene_id=scene.scene_id,
+                              start_s=round(max(0.0, t), 3)))
+        tout = plan.transition_out
+        if i < len(scenes) - 1 and tout.type in TRANSITION_SFX:
+            family, lead = TRANSITION_SFX[tout.type]
+            t = (s0 + plan.duration_frames - tout.frames) / FPS - lead
+            sfx.append(SfxCue(id=f"transition_{tout.type}", family=family,
+                              scene_id=scene.scene_id, start_s=round(max(0.0, t), 3)))
+        mood = BEAT_MOOD.get(scene.beat, "curious")
+        music.append(MusicSection(scene_id=scene.scene_id, mood=mood,
+                                  start_s=round(s0 / FPS, 3),
+                                  end_s=round((s0 + plan.duration_frames) / FPS, 3)))
+    return sorted(sfx, key=lambda c: c.start_s), music
+
+
 class TimingStage(Stage):
     name = "timing"
     lane = Lane.MEDIA
-    version = "2"  # v2: word timings + on-screen caption chunks (D7)
+    version = "3"  # v3: SFX cues + music sections; v2: word timings + captions (D7)
     depends_on = ("storyboard", "voice", "subtitles")
     max_attempts = 1
 
@@ -230,10 +276,12 @@ class TimingStage(Stage):
         srt = write_text(cdir, ctx.workdir / "en.srt", to_srt(cues))
         vtt = write_text(cdir, ctx.workdir / "en.vtt", to_vtt(cues))
 
+        sfx, music = audio_plan(board, scenes, scene_starts, starts_all)
         plan = RenderPlan(episode_slug=board.episode_slug,
                           storyboard_version=int(ctx.upstream["storyboard"]["version"]),
                           fps=FPS, width=board.width, height=board.height, scenes=scenes,
                           scene_start_frames=scene_starts, total_frames=offset, audio=audio,
+                          sfx=sfx, music=music,
                           subtitles_srt=srt, subtitles_vtt=vtt)
         longer = [f"{s.scene_id} extended to {p.duration_frames / FPS:.1f}s for its dialogue"
                   for s, p in zip(board.scenes, scenes, strict=True)

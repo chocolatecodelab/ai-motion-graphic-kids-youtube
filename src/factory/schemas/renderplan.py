@@ -107,6 +107,20 @@ class AudioCue(BaseModel):
     duration_s: float
 
 
+class SfxCue(BaseModel):
+    id: str  # storyboard SFX id, or transition_<type>
+    family: str  # procedural synth family (factory.media.synth)
+    scene_id: str
+    start_s: float
+
+
+class MusicSection(BaseModel):
+    scene_id: str
+    mood: str  # curious | adventure | wonder | mystery | warm
+    start_s: float
+    end_s: float
+
+
 class RenderPlan(BaseModel):
     schema_version: Literal["renderplan.v1"] = "renderplan.v1"
     episode_slug: str
@@ -118,6 +132,8 @@ class RenderPlan(BaseModel):
     scene_start_frames: list[int]
     total_frames: int
     audio: list[AudioCue]
+    sfx: list[SfxCue] = Field(default_factory=list)
+    music: list[MusicSection] = Field(default_factory=list)
     subtitles_srt: str | None = None
     subtitles_vtt: str | None = None
     notes: list[str] = Field(default_factory=list)

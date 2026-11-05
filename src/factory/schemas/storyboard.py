@@ -68,18 +68,41 @@ class Shot(BaseModel):
     note: str = Field(default="", max_length=140, description="Director's intent")
 
 
+# M2 SVG scene library (remotion/src/scene/bg/themes.tsx); keep in sync with types.ts Theme.
+THEME_GUIDE: dict[str, str] = {
+    "attic": "grandparent's attic, round window, shelves",
+    "workbench": "attic workbench with lamp, gears and tools",
+    "sunbeam": "inside a beam of light, rainbow ribbons, stars",
+    "sky": "open sky, sun, clouds, green hills",
+    "air": "among air molecules (N2/O2 pairs)",
+    "sunset": "low sun, warm sky, purple hills, pines",
+    "mars": "Martian landscape, rocks, blue-grey sun halo",
+    "space": "stars, a ringed planet, Earth",
+    "studio": "neutral paper backdrop with map contours",
+    "forest": "pine forest, hills, falling leaves",
+    "jungle": "rainforest trunks, vines, big leaves, mist",
+    "ocean": "beach with waves and palm trees",
+    "underwater": "under the sea: light rays, seaweed, coral, fish, bubbles",
+    "desert": "sand dunes, cactus, hot sun, mesas",
+    "mountains": "snowy peaks, pines, rocks",
+    "arctic": "snow, ice, igloo, northern lights",
+    "volcano": "smoking volcano, lava glow, dark rocks",
+    "cave": "dark cave, stalactites, glowing crystals",
+    "city": "city skyline, street, trees, lamp post",
+    "lab": "science lab: chalkboard, bubbling beakers, microscope",
+    "library": "tall bookshelves, globe, rug",
+    "night": "night sky, moon, stars, campsite tent and campfire, fireflies",
+}
 Theme = Literal["attic", "workbench", "sunbeam", "sky", "air", "sunset", "mars", "space",
-                "studio"]
+                "studio", "forest", "jungle", "ocean", "underwater", "desert", "mountains",
+                "arctic", "volcano", "cave", "city", "lab", "library", "night"]
 
 
 class Background(BaseModel):
     theme: Theme | None = Field(
         default=None,
-        description="Environment the renderer draws: attic (grandparent's attic, round window), "
-                    "workbench (attic workbench with tools), sunbeam (inside a beam of light, "
-                    "rainbow ribbons), sky (open sky, clouds, rooftops), air (among air "
-                    "molecules), sunset (low sun, warm sky, hills), mars (Martian landscape), "
-                    "space (stars, planets), studio (neutral backdrop)",
+        description="Environment the renderer draws: "
+                    + "; ".join(f"{k} ({v})" for k, v in THEME_GUIDE.items()),
     )
     library_id: str | None = Field(default=None, description="Reuse an existing library scene")
     asset_request: str | None = Field(

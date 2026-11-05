@@ -103,6 +103,7 @@ class QAStage(Stage):
     def input_payload(self, ctx: StageContext) -> Mapping[str, Any]:
         a = ctx.upstream["assemble"]
         return {"video": a.get("video"), "loudness": a.get("loudness_lufs"),
+                "voice_stem": a.get("voice_stem"),
                 "timing": ctx.upstream["timing"]["sha256"],
                 "script": ctx.upstream["script"]["sha256"]}
 
@@ -130,7 +131,9 @@ class QAStage(Stage):
         results.append(C.check_black(scan))
         results.append(C.check_freeze(scan))
         speech = [(a.start_s, a.start_s + a.duration_s) for a in plan.audio]
-        results += C.check_silence(scan, speech)
+        stem = assembled.get("voice_stem")
+        voice_sil = C.silences(cdir / stem) if stem and (cdir / stem).exists() else None
+        results += C.check_silence(scan, speech, voice_silence=voice_sil)
         results += C.check_loudness(video)
 
         words = self.stt().transcribe_words(video, hint="Arka, Lipa.")

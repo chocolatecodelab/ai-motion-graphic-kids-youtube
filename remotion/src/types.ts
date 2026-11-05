@@ -16,7 +16,10 @@ export type Motion =
   | "bounce" | "zip";
 export type Entrance = "none" | "from_left" | "from_right" | "from_top" | "from_bottom" | "pop" | "portal";
 export type TransitionType = "compass_portal" | "wipe" | "cut" | "zoom_through" | "fade" | "whip";
-export type Theme = "attic" | "workbench" | "sunbeam" | "sky" | "air" | "sunset" | "mars" | "space" | "studio";
+export type Theme =
+  | "attic" | "workbench" | "sunbeam" | "sky" | "air" | "sunset" | "mars" | "space" | "studio"
+  | "forest" | "jungle" | "ocean" | "underwater" | "desert" | "mountains" | "arctic" | "volcano"
+  | "cave" | "city" | "lab" | "library" | "night";
 
 export interface PlanWaypoint { x: number; y: number; scale: number; frame: number }
 

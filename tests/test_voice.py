@@ -65,7 +65,9 @@ def test_voice_stage_writes_lines_preview_and_manifest(tmp_path: Path) -> None:
     assert refs_out["overall_wer"] == 0 and refs_out["cached_lines"] == 0
     assert len(manifest.lines) == refs_out["lines"] == 14
     first = manifest.lines[0]
-    assert (tmp_path / "content" / first.file).exists() and first.voice == "af_heart"
+    hero = ctx(tmp_path, "voice").settings
+    assert (tmp_path / "content" / first.file).exists() and first.voice == hero.tts_hero_voice
+    assert first.pitch == hero.tts_hero_pitch
     lipa = next(v for v in manifest.lines if v.speaker == "lipa")
     assert lipa.voice == "af_sky" and lipa.speed == 1.1
     assert first.peak_dbfs <= -0.9  # normalised with a -1 dBFS ceiling

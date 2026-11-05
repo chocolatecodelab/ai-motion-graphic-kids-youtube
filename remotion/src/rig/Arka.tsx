@@ -46,7 +46,7 @@ export type ArkaProps = {
   uid?: string;
   breathe?: boolean;
   /** Follow-through (polish): head trails the body. Derive from pose velocity, e.g.
-   *  y = (rootY_now - rootY_2framesAgo) * 0.6, tilt = (lean_3framesAgo - lean_now) * 0.7. */
+   *  y = (rootY_2framesAgo - rootY_now) * 0.6, tilt = (lean_3framesAgo - lean_now) * 0.7. */
   overlap?: { y: number; tilt: number };
 };
 
@@ -742,6 +742,7 @@ export const Arka: React.FC<ArkaProps> = ({
 }) => {
   const lagY = clamp(overlap.y, -7, 7);
   const lagTilt = clamp(overlap.tilt, -6, 6);
+  const packLag = clamp(overlap.y * 1.4, -9, 9); // heavy backpack trails a bit more than the head
   const propS = clamp(pose.propScale ?? 1, 0, 1);
   const scaled = (c: Vec, node: React.ReactNode) =>
     propS >= 0.999 ? node : (
@@ -776,7 +777,9 @@ export const Arka: React.FC<ArkaProps> = ({
         {/* back layer */}
         <g transform={torsoT}>
           <Scarf t={t} wind={pose.scarfWind} />
-          <Backpack />
+          <g transform={`translate(0 ${packLag.toFixed(2)})`}>
+            <Backpack />
+          </g>
         </g>
         {/* legs */}
         <LegShape l={legL} />

@@ -21,6 +21,7 @@ class VoiceLine(BaseModel):
     text: str
     voice: str
     speed: float
+    pitch: float = 0.0  # semitones applied after TTS
     file: str  # relative to content dir
     sha256: str
     duration_s: float

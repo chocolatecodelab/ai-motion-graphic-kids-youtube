@@ -1,6 +1,6 @@
 """`voice` stage: synthesize every script line with the character's Kokoro voice.
 
-Per line: TTS -> loudness-normalise -> WAV (+ word timestamps) -> local STT check.
+Per line: TTS -> pitch shift (if set) -> normalise -> WAV (+ word timestamps) -> local STT check.
 Lines are cached by (engine, model, voice, speed, text), so re-runs after a script
 edit only synthesize the lines that changed.
 
@@ -22,6 +22,7 @@ from factory.agents.common import content_dir, load_upstream, save
 from factory.artifacts import write_text
 from factory.db.models import Lane
 from factory.media import audio as A
+from factory.media import voicefx as V
 from factory.media.stt import Transcriber, WhisperTranscriber, normalize_words, wer
 from factory.pipeline import PermanentStageError, Stage, StageContext, StageResult
 from factory.providers.tts import TTSProvider, get_tts
@@ -38,17 +39,26 @@ DURATION_DRIFT_WARN = 0.25
 DURATION_TOLERANCE = 0.10
 
 
-def voice_for(speaker: str, ctx: StageContext) -> tuple[str, float]:
+def voice_for(speaker: str, ctx: StageContext) -> tuple[str, float, float]:
+    """(Kokoro voice spec, speed, pitch semitones). A spec may blend voices: "am_puck,af_heart"."""
     s = ctx.settings
     if speaker == "lipa":
-        return s.tts_companion_voice, s.tts_companion_speed
-    return s.tts_hero_voice, s.tts_hero_speed
+        return s.tts_companion_voice, s.tts_companion_speed, s.tts_companion_pitch
+    return s.tts_hero_voice, s.tts_hero_speed, s.tts_hero_pitch
+
+
+def style_for(speaker: str, ctx: StageContext) -> V.VoiceStyle:
+    s = ctx.settings
+    if speaker == "lipa":
+        return V.VoiceStyle(s.tts_companion_pitch_hz, s.tts_companion_formant,
+                            s.tts_companion_range)
+    return V.VoiceStyle(s.tts_hero_pitch_hz, s.tts_hero_formant, s.tts_hero_range)
 
 
 class VoiceStage(Stage):
     name = "voice"
     lane = Lane.MEDIA
-    version = "1"
+    version = "3"  # v3: expressive (emotion, sentence pauses, Praat style); v2: trim
     depends_on = ("brief", "script", "script_validate")
     max_attempts = 2
 
@@ -69,9 +79,12 @@ class VoiceStage(Stage):
     def input_payload(self, ctx: StageContext) -> Mapping[str, Any]:
         s = ctx.settings
         return {"script": ctx.upstream["script"]["sha256"],
-                "voices": [s.tts_provider, s.tts_hero_voice, s.tts_hero_speed,
-                           s.tts_companion_voice, s.tts_companion_speed],
-                "lexicon": sha256_text(json.dumps(load_lexicon(), sort_keys=True))}
+                "voices": [s.tts_provider, s.tts_hero_voice, s.tts_hero_speed, s.tts_hero_pitch,
+                           s.tts_companion_voice, s.tts_companion_speed, s.tts_companion_pitch],
+                "lexicon": sha256_text(json.dumps(load_lexicon(), sort_keys=True)),
+                "expressive": [s.tts_expressive, repr(style_for("arka", ctx)),
+                               repr(style_for("lipa", ctx)),
+                               sorted((k, repr(v)) for k, v in V.EMOTIONS.items())]}
 
     def run(self, ctx: StageContext) -> StageResult:
         brief = load_upstream(ctx, "brief", TopicBrief)
@@ -87,13 +100,15 @@ class VoiceStage(Stage):
         sample_rate = 0
         cursor = 0.0
         for ln in script.lines:
-            voice, speed = voice_for(ln.speaker, ctx)
+            voice, speed, pitch = voice_for(ln.speaker, ctx)
             if not voice:
                 raise PermanentStageError(f"no voice configured for {ln.speaker}")
-            key = hashlib.sha256(json.dumps(
-                [tts.info.engine, tts.info.model, voice, speed, ln.text,
-                 sorted(load_lexicon().items())]).encode()).hexdigest()
-            audio, sr, words, cached = self._synth(tts, cache_dir, key, ln.text, voice, speed)
+            expressive = ctx.settings.tts_expressive
+            emo = V.emotion(ln.emotion) if expressive else V.Emotion(1.0, 0.0, 1.0)
+            style = style_for(ln.speaker, ctx) if expressive else V.VoiceStyle()
+            audio, sr, words, cached = self._perform(
+                tts, cache_dir, ln.text if not expressive else None, ln.text, voice,
+                speed * emo.speed, pitch, style, emo)
             sample_rate = sample_rate or sr
             if sr != sample_rate:
                 raise PermanentStageError(f"sample rate changed mid-episode ({sr})")
@@ -117,6 +132,7 @@ class VoiceStage(Stage):
                                 f"{ln.est_duration_s:.1f}s")
             out_lines.append(VoiceLine(
                 line_id=ln.line_id, speaker=ln.speaker, text=ln.text, voice=voice, speed=speed,
+                pitch=pitch,
                 file=path.resolve().relative_to(cdir.resolve()).as_posix(),
                 sha256=hashlib.sha256(data).hexdigest(), duration_s=duration,
                 est_duration_s=ln.est_duration_s, preview_start_s=round(cursor, 3),
@@ -164,6 +180,37 @@ class VoiceStage(Stage):
                             "warnings": len(manifest.warnings),
                             "cached_lines": sum(v.cached for v in out_lines)})
 
+    def _perform(self, tts: TTSProvider, cache_dir: Path, whole: str | None, text: str,
+                 voice: str, speed: float, pitch: float, style: V.VoiceStyle,
+                 emo: V.Emotion):  # type: ignore[no-untyped-def]
+        """Synthesize a line sentence by sentence: trim each sentence's silence, apply the
+        character style + emotion, join with punctuation-aware pauses. Word timings follow.
+        `whole` set = legacy single-shot synthesis (expressive off)."""
+        parts: list[np.ndarray] = []
+        words: list[Word] = []
+        cursor, sr, all_cached = 0.0, 0, True
+        sents = [whole] if whole is not None else (V.sentences(text) or [text])
+        for i, sent in enumerate(sents):
+            key = hashlib.sha256(json.dumps(
+                [tts.info.engine, tts.info.model, voice, round(speed, 4), sent,
+                 sorted(load_lexicon().items())]).encode()).hexdigest()
+            audio, sr, raw_words, cached = self._synth(tts, cache_dir, key, sent, voice, speed)
+            all_cached &= cached
+            # Trim Kokoro's leading/trailing silence so a span is its speech (tight pacing,
+            # and QA can tell a real dropout from a long tail); shift words to match.
+            audio, lead = A.trim_silence(A.pitch_shift(audio, sr, pitch), sr)
+            audio = V.express(audio, sr, style, emo)
+            words += [Word(text=w.text, start=round(max(0.0, w.start - lead) + cursor, 3),
+                           end=round(max(0.0, w.end - lead) + cursor, 3)) for w in raw_words]
+            parts.append(audio)
+            cursor += audio.size / sr
+            if i < len(sents) - 1:
+                gap = V.pause_after(sent)
+                parts.append(A.silence(gap, sr))
+                cursor += gap
+        return (np.concatenate(parts) if parts else np.zeros(0, np.float32)), sr, words, \
+            all_cached
+
     @staticmethod
     def _synth(tts: TTSProvider, cache_dir: Path, key: str, text: str, voice: str,
                speed: float):  # type: ignore[no-untyped-def]
@@ -188,7 +235,8 @@ def voice_report(m: VoiceManifest) -> str:
            "| line | speaker | voice | dur | est | WER | heard |", "|---|---|---|---|---|---|---|"]
     for v in m.lines:
         flag = " ⚠" if v.warnings else ""
-        out.append(f"| {v.line_id}{flag} | {v.speaker} | {v.voice}@{v.speed:g} | "
+        shift = f" {v.pitch:+g}st" if v.pitch else ""
+        out.append(f"| {v.line_id}{flag} | {v.speaker} | {v.voice}@{v.speed:g}{shift} | "
                    f"{v.duration_s:.1f}s | {v.est_duration_s:.1f}s | {v.wer:.0%} | "
                    f"{v.stt_text.replace('|', '/')} |")
     if m.warnings:

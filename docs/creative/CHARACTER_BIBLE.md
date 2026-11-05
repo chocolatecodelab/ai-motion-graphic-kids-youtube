@@ -96,6 +96,15 @@ These rules are built into the rig and the scene renderer (`remotion/src/scene/p
 7. **Living stillness.** A standing character keeps a slow weight shift and breathing. Talking adds small hand and head beats.
 8. **Paper flight.** Lipa's wingbeat is a quick power downstroke and a slower upstroke. The wing tips trail the roots, so the paper flexes, and the body lifts on each downstroke.
 
+Refinements added 2026-11-05 at the owner's request ("polish more"):
+
+9. **Planted feet.** When Arka walks along a path, the step rate follows the distance actually covered, so the standing foot never slides. The gait fades in and out with the path's own easing as Arka starts and stops.
+10. **Relaxed idle.** The idle stance is a soft contrapposto: weight on one leg, knees never locked straight.
+11. **Expressions blend.** Between shots, eyes, brows, blush and mouth opening move to the new expression over 8 frames. A change of eye shape (open to happy, for example) hides behind a quick blink.
+12. **Eye glances.** Every 1.6 to 2.8 s the eyes make a small shift and hold, like real eyes. Poses whose gaze matters (map, compass, sky, spyglass, thinking) keep their gaze.
+13. **Secondary motion.** The backpack trails vertical body motion a little more than the head.
+14. **Lipa pitches into her flight.** Nose down when dropping, nose up when climbing, and a faster wingbeat while climbing.
+
 ## Consistency rules
 1. Only rig IDs from `config/catalogue/rig_v2.yaml` exist. Unknown poses or expressions fail the storyboard check. Old rig v1 storyboards (`kai`/`needle`) still load and render through ID aliases.
 2. Colours come from `remotion/src/rig/palette.ts`. No per-episode recolouring.

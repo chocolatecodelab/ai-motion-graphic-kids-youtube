@@ -151,3 +151,35 @@ Known limitations, to be addressed in M2 (art direction):
 | **FFmpeg** | ✅ Core | Mixing, loudness (R128), concat, encode, blackdetect/silencedetect/freezedetect QA |
 | **Three.js** via `@remotion/three` | ✅ Selective, inside Remotion only | For scenes that really need 3D: planets/orbits, the Sun's layers, molecules, exploded machines. Not for the characters (they stay 2D vector puppets, D5). Uses CPU software WebGL here, so render cost must be measured per component and cached per scene |
 | **yt-dlp** | ❌ Not in the pipeline | YouTube's Terms of Service don't allow downloading videos without permission, and we must never reuse competitor footage. Competitor research uses the **YouTube Data API** for metadata (titles, durations, views, upload cadence, thumbnail URLs for side-by-side review only). Our own videos can be fetched through YouTube Studio / API if ever needed |
+
+## 2026-11-05: Arka's voice is a boy's voice; procedural music and SFX (M2)
+
+| Topic | Decision |
+|---|---|
+| Arka's voice | The owner noted `af_heart` sounds like a girl, but Arka is a 10-year-old boy. Kokoro has no child voices, so a bake-off (`voice_bakeoff/arka_voice.py`) compared male voices, male/female blends and pitch-raised versions, with median pitch and Whisper intelligibility for each. **Owner pick (by ear): candidate E, `am_puck,af_heart` blend raised +3 semitones** (~183 Hz, WER 3%). Speed stays 1.0. Lipa is unchanged (`af_sky` 1.1). Settings: `FACTORY_TTS_HERO_VOICE=am_puck,af_heart`, `FACTORY_TTS_HERO_PITCH=3` |
+| Pitch shift | ffmpeg `rubberband` after TTS, duration preserved, so word timings and lip-sync stay valid. Formants move with the pitch (a smaller vocal tract reads as younger) |
+| Line trimming | Each voice line's leading and trailing silence is trimmed (60 ms pad kept), so dialogue pacing is tighter and QA can tell a real dropout from a long tail |
+| Music bed | Procedural (`factory.media.synth`), free and original under D2: one tempo (96 BPM) and key per episode. Each scene's beat sets the mood (hook/mystery: curious, adventure: adventure, discovery: wonder, twist: mystery, takeaway: warm), with 1.2 s crossfades. It sits about 11 dB under speech and ducks a further ~11 dB while someone talks |
+| SFX | Storyboard SFX ids map by keyword to 14 synthesized families (whoosh, riser, portal, boing, click, sparkle, chime, pop, thud, pluck, fanfare, wind, hum, paper). Portal, whip and zoom transitions get their own whoosh. SFX sit about 7 dB under speech |
+| QA | A voice-only stem is kept; dropouts are checked on the stem (music would hide them) and long gaps on the final mix |
+## 2026-11-05: Arka's voice v2: natural and expressive (supersedes the rubberband boy voice)
+
+The owner heard the +3 st rubberband voice as robotic, flat and too fast. Causes: the ffmpeg rubberband filter was in its low-quality pitch mode, and a phase vocoder sounds metallic on speech anyway; Kokoro reads every line with the same pace and a narrow pitch range.
+
+| Topic | Decision |
+|---|---|
+| Boy voice | **Praat PSOLA "Change gender"** (`parselmouth`, `factory.media.voicefx`) instead of rubberband: pitch median to 235 Hz, formants ×1.12 (smaller vocal tract), pitch range ×1.5. Bake-off v2 (`voice_bakeoff/arka_voice_v2.py`), **owner pick by ear: P3, `am_echo` base**: intonation 6.3 st vs 3.8 st before, WER 5% |
+| Emotion | Every script line's emotion sets pace, pitch offset and intonation range (e.g. thoughtful 0.87× pace, −0.6 st, narrower; excited 1.0×, +1.4 st, wider). Applies to Lipa too (`af_sky`, range ×1.15) |
+| Pacing | Lines are synthesized sentence by sentence, silence-trimmed, and joined with punctuation-aware pauses (. 0.30 s, ! 0.32 s, ? 0.36 s, … 0.45 s) |
+| Licence | parselmouth wraps Praat (GPL-3.0). It runs locally as a processing tool; the audio it outputs is ours. If this repository is ever distributed under a non-GPL licence, revisit (alternative: WORLD vocoder, MIT) |
+| Settings | `FACTORY_TTS_HERO_VOICE=am_echo`, `FACTORY_TTS_HERO_PITCH=0` (rubberband off), `FACTORY_TTS_EXPRESSIVE=true`, `FACTORY_TTS_HERO_PITCH_HZ=235`, `FACTORY_TTS_HERO_FORMANT=1.12`, `FACTORY_TTS_HERO_RANGE=1.5`, `FACTORY_TTS_COMPANION_RANGE=1.15` |
+## 2026-11-05: SVG scene library v1 (M2)
+
+| Topic | Decision |
+|---|---|
+| Style | Backgrounds now match the Arka & Lipa rig: ink-plum outlines, the rig palette, one soft shade per shape. They replace the M1 placeholder environments |
+| Structure | `remotion/src/scene/bg/kit.tsx` holds reusable outlined elements (clouds, hills, mountains, trees, pines, bushes, rocks, tufts, sun, stars, waves, seaweed, fish, bubbles, falling snow/leaves/rain, motes, buildings). `bg/themes.tsx` composes them into environments, each in 3 parallax layers (far/mid/near) that extend past the frame |
+| Environments (22) | attic, workbench, sunbeam, sky, air, sunset, mars, space, studio (restyled) + forest, jungle, ocean, underwater, desert, mountains, arctic, volcano, cave, city, lab, library, night (new) |
+| Motion | Every scene has ambient motion (drifting clouds, swaying trees and seaweed, waves, rising bubbles, twinkling stars, volcano smoke, bubbling beakers, fireflies, a flickering campfire) that is a pure function of the frame |
+| Composition | Props frame the screen edges and keep the centre clear for the characters; the ground line is at 0.93 H |
+| Contract | The storyboard's `background.theme` accepts all 22 ids (schema + prompt); `theme_for()` keyword fallback updated. Review sheet: `docs/creative/scene_library_v1.png` (`BackgroundSheet` still) |
