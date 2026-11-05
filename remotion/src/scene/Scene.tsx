@@ -5,11 +5,14 @@ import { C } from "../brand";
 import { GraphicView } from "../graphics/Graphics";
 import { Arka } from "../rig/Arka";
 import { Lipa } from "../rig/lipa";
-import type { PlanGraphic, PlanScene, PlanShot, SceneProps } from "../types";
+import type { PlanGraphic, PlanProp, PlanScene, PlanShot, SceneProps } from "../types";
+import { Layer as PropLayer } from "./bg/kit";
+import { PropView } from "./bg/props";
 import { BackgroundLayer, LAYER_PARALLAX, type Layer } from "./Backgrounds";
 import { Captions } from "./Captions";
 import { actorAt, ActorState, cameraAt, CameraState, DEPTH_PARALLAX, H, W } from "./layout";
 import { arkaFaceAt, arkaOverlap, arkaPoseAt, type ArkaCtx, blinkAt, lipaStateAt } from "./puppets";
+import { type Box, placeGraphic, type Placement } from "./placement";
 import { SceneTransitions, transitionCameraBoost } from "./Transitions";
 
 const shotAt = (scene: PlanScene, f: number): PlanShot =>
@@ -80,29 +83,43 @@ const Actor: React.FC<{ a: ActorState; ctx: ArkaCtx; t: number; frame: number; m
   );
 };
 
-const GraphicLayer: React.FC<{ g: PlanGraphic; frame: number; focus: boolean; fps: number; index: number; side: "left" | "right" }> = ({
-  g, frame, focus, fps, index, side,
+const GraphicLayer: React.FC<{ g: PlanGraphic; frame: number; focus: boolean; fps: number; place: Placement }> = ({
+  g, frame, focus, fps, place,
 }) => {
   if (frame < g.start_frame || frame >= g.end_frame) return null;
   const t = frame - g.start_frame;
   const len = g.end_frame - g.start_frame;
   const fade = Math.min(1, t / 8, (len - t) / 8);
-  // Panels sit on the side away from the characters, so they never cover a face.
-  const placement: React.CSSProperties = focus
-    ? { left: "50%", top: "50%", translate: "-50% -50%", scale: "1.2" }
-    : g.component === "Label"
-      ? side === "left" ? { left: 80, top: 70 + index * 110 } : { right: 80, top: 70 + index * 110 }
-      : g.component === "Recap"
-        ? { left: "50%", top: "50%", translate: "-50% -50%" }
-        : side === "left"
-          ? { left: 60, top: "50%", translate: "0 -50%", scale: "0.78", transformOrigin: "0 50%" }
-          : { right: 60, top: "50%", translate: "0 -50%", scale: "0.78", transformOrigin: "100% 50%" };
+  // Focus shots frame the graphic large in the centre; otherwise collision-aware placement
+  // (scene/placement.ts) keeps panels off the characters.
+  const style: React.CSSProperties = focus
+    ? { left: "50%", top: "47%", translate: "-50% -50%", scale: "1.15" }
+    : { left: place.left, top: place.top, scale: String(place.scale), transformOrigin: "0 0" };
+  const shown = place.layout ? { ...g, props: { ...g.props, layout: place.layout } } : g;
   return (
-    <div style={{ position: "absolute", opacity: Math.max(0, fade), ...placement }}>
-      <GraphicView g={g} t={t} len={len} fps={fps} />
+    <div style={{ position: "absolute", opacity: Math.max(0, fade), ...style }}>
+      <GraphicView g={shown} t={t} len={len} fps={fps} />
     </div>
   );
 };
+
+/** Characters' on-screen boxes for a shot (rest positions through the opening camera). */
+const characterBoxes = (actors: ActorState[], depths: PlanShot["blocking"][number]["depth"][], cam: CameraState): Box[] =>
+  actors.map((a, i) => {
+    const k = DEPTH_PARALLAX[depths[i] ?? "midground"];
+    const zoom = 1 + (cam.zoom - 1) * k;
+    const cx = W / 2 + (cam.cx - W / 2) * k;
+    const cy = H / 2 + (cam.cy - H / 2) * k;
+    const sx = (x: number) => (x - cx) * zoom + W / 2;
+    const sy = (y: number) => (y - cy) * zoom + H / 2;
+    if (a.character === "arka") {
+      const w = a.height * 0.62;
+      return { x0: sx(a.x - w / 2), x1: sx(a.x + w / 2), y0: sy(a.y - a.height * 1.03), y1: sy(a.y) };
+    }
+    const r = a.height * 0.7;
+    const c = a.y - a.height / 2;
+    return { x0: sx(a.x - r), x1: sx(a.x + r), y0: sy(c - r), y1: sy(c + r) };
+  });
 
 export const Scene: React.FC<SceneProps> = ({ scene }) => {
   const frame = useCurrentFrame();
@@ -141,20 +158,29 @@ export const Scene: React.FC<SceneProps> = ({ scene }) => {
   const cam = cameraAt(shot, t, actors, actorsStart);
   const boost = transitionCameraBoost(frame, scene.duration_frames, scene.transition_in, scene.transition_out);
 
-  // Where the characters stand on screen in this shot -> graphics go on the opposite side.
+  // Where the characters stand on screen in this shot -> graphics go where they cover no one.
   // Decided once per shot (rest positions, opening camera) so panels never jump mid-shot.
   const camStart = cameraAt(shot, 0, actorsStart, actorsStart);
-  const screenX = actorsStart.map((a) => (a.x - camStart.cx) * camStart.zoom + W / 2);
-  const avgX = screenX.length ? screenX.reduce((s, x) => s + x, 0) / screenX.length : W / 2;
-  const graphicSide: "left" | "right" = avgX > W / 2 ? "left" : "right";
+  const boxes = characterBoxes(actorsStart, shot.blocking.flatMap((b) => [b.depth, b.depth]), camStart)
+    .filter((b) => b.x1 > 0 && b.x0 < W && b.y1 > 0 && b.y0 < H);
+  let labelIndex = 0;
+  const places = scene.graphics.map((g) => placeGraphic(g.component, boxes, g.component === "Label" ? labelIndex++ : 0));
 
   const speaking = scene.lines.find((l) => frame >= l.start_frame && frame < l.end_frame);
   const mouthFor = (who: string) =>
     speaking && speaking.speaker === who ? speaking.mouth[frame - speaking.start_frame] ?? 0 : 0;
 
+  const props = scene.props ?? [];
+  const propsAt = (depth: PlanProp["depth"]) => {
+    const list = props.filter((p) => p.depth === depth);
+    return list.length ? (
+      <PropLayer>{list.map((p, i) => <PropView key={i} p={p} f={frame} />)}</PropLayer>
+    ) : null;
+  };
   const layer = (name: Layer) => (
     <AbsoluteFill style={{ transform: worldTransform(cam, LAYER_PARALLAX[name], boost), transformOrigin: "0 0" }}>
       <BackgroundLayer theme={scene.theme} layer={name} frame={frame} />
+      {propsAt(name)}
     </AbsoluteFill>
   );
 
@@ -179,8 +205,13 @@ export const Scene: React.FC<SceneProps> = ({ scene }) => {
       {byDepth("background")}
       {byDepth("midground")}
       {byDepth("foreground")}
+      {props.some((p) => p.depth === "front") && (
+        <AbsoluteFill style={{ transform: worldTransform(cam, DEPTH_PARALLAX.foreground, boost), transformOrigin: "0 0" }}>
+          {propsAt("front")}
+        </AbsoluteFill>
+      )}
       {scene.graphics.map((g, i) => (
-        <GraphicLayer key={i} g={g} frame={frame} fps={fps} index={i} side={graphicSide}
+        <GraphicLayer key={i} g={g} frame={frame} fps={fps} place={places[i]}
           focus={shot.focus === "graphic" || shot.shot_type === "insert"} />
       ))}
       <Captions captions={scene.captions ?? []} frame={frame} />

@@ -63,6 +63,16 @@ export interface PlanCaption {
 
 export interface PlanTransition { type: TransitionType; frames: number }
 
+/** Set dressing from the visual_plan + assets stages. */
+export interface PlanProp {
+  kind: "builtin" | "svg";
+  ref: string;
+  svg?: string | null; // sanitised markup for kind="svg"
+  x: number; y: number; scale: number;
+  depth: "far" | "mid" | "near" | "front";
+  flip: boolean;
+}
+
 export interface PlanScene {
   scene_id: string;
   beat: string;
@@ -73,6 +83,7 @@ export interface PlanScene {
   graphics: PlanGraphic[];
   lines: PlanLine[];
   captions?: PlanCaption[];
+  props?: PlanProp[];
   transition_in: PlanTransition;
   transition_out: PlanTransition;
 }

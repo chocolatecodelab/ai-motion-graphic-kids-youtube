@@ -10,9 +10,9 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from factory.schemas.characters import CharacterId
+from factory.schemas.storyboard import Theme
 
-Theme = Literal["attic", "workbench", "sunbeam", "sky", "air", "sunset", "mars", "space",
-                "studio"]
+# Single source of truth for environment ids: the storyboard schema (22 scene-library themes).
 
 
 class PlanWaypoint(BaseModel):
@@ -86,6 +86,19 @@ class PlanTransition(BaseModel):
     frames: int
 
 
+class PlanProp(BaseModel):
+    """Set dressing (visual_plan + assets): a built-in prop or an inline, sanitised SVG."""
+
+    kind: Literal["builtin", "svg"]
+    ref: str  # built-in id or library asset id
+    svg: str | None = None  # sanitised markup for kind="svg"
+    x: float
+    y: float
+    scale: float = 1.0
+    depth: Literal["far", "mid", "near", "front"] = "near"
+    flip: bool = False
+
+
 class PlanScene(BaseModel):
     scene_id: str
     beat: str
@@ -98,6 +111,7 @@ class PlanScene(BaseModel):
     captions: list[PlanCaption] = Field(default_factory=list)
     transition_in: PlanTransition
     transition_out: PlanTransition
+    props: list[PlanProp] = Field(default_factory=list)
 
 
 class AudioCue(BaseModel):

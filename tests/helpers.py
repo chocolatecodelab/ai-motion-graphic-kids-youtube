@@ -122,3 +122,27 @@ def storyboard_for(script: Any, pad: float = 1.0) -> dict[str, Any]:
             "educational_purpose": "understand the idea",
         })
     return {"scenes": scenes}
+
+
+GOOD_SVG = (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">'
+    '<path d="M120 390 L200 120 L280 390Z" fill="#D2A040" stroke="#2B2240" stroke-width="7" '
+    'stroke-linejoin="round"/>'
+    '<path d="M200 120 L280 390 L215 390Z" fill="#A6772A"/>'
+    '<circle cx="200" cy="110" r="40" fill="#4E92D6" stroke="#2B2240" stroke-width="7"/>'
+    '<circle cx="186" cy="96" r="10" fill="#FFFFFF" opacity="0.6"/>'
+    '<rect x="150" y="370" width="100" height="20" rx="8" fill="#9A6438" stroke="#2B2240" '
+    'stroke-width="6"/></svg>'
+)
+
+
+def visual_plan_for(scene_ids: list[str]) -> dict:
+    """A valid visual plan: a built-in prop per scene and one new asset in the first scene."""
+    scenes = [{"scene_id": sid, "props": [{"ref": "builtin:rock", "x": 0.1, "y": 0.93,
+                                           "scale": 1.0, "depth": "near"}],
+               "why": "ground detail"} for sid in scene_ids]
+    scenes[0]["props"].append({"ref": "new:brass_telescope", "x": 0.88, "y": 0.93,
+                               "scale": 1.1, "depth": "near", "flip": True})
+    return {"scenes": scenes, "asset_requests": [
+        {"request_id": "brass_telescope", "name": "brass telescope",
+         "description": "a small brass telescope on a wooden tripod", "tags": ["space", "attic"]}]}

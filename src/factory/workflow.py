@@ -8,6 +8,7 @@ timing -> render_scenes (render lane) -> assemble (media lane) -> qa -> episode 
 from __future__ import annotations
 
 from factory.agents.assemble import AssembleStage
+from factory.agents.assets import AssetsStage
 from factory.agents.brief import BriefStage
 from factory.agents.qa import QAStage
 from factory.agents.render import RenderScenesStage
@@ -16,6 +17,7 @@ from factory.agents.script_validate import ScriptValidateStage
 from factory.agents.storyboard import StoryboardStage
 from factory.agents.subtitles import SubtitlesStage
 from factory.agents.timing import TimingStage
+from factory.agents.visual_plan import VisualPlanStage
 from factory.agents.voice import VoiceStage
 from factory.media.stt import Transcriber, WordTranscriber
 from factory.pipeline import Workflow
@@ -34,6 +36,8 @@ def build_workflow(
         ScriptStage(llm),
         ScriptValidateStage(llm),
         StoryboardStage(llm),
+        VisualPlanStage(llm),
+        AssetsStage(llm),
         VoiceStage(tts, stt),
         SubtitlesStage(),
         TimingStage(),

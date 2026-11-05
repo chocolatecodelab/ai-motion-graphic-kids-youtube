@@ -80,6 +80,25 @@ def components() -> Components:
     return Components(data["version"], data["components"])
 
 
+@dataclass(frozen=True)
+class Props:
+    version: str
+    items: dict[str, dict[str, Any]]
+
+    def describe(self) -> str:
+        return "\n".join(f"- builtin:{name}: {p['size']} (tags: {', '.join(p['tags'])})"
+                         for name, p in self.items.items())
+
+
+PROPS_FILE = "props_v1.yaml"
+
+
+@lru_cache(maxsize=1)
+def props() -> Props:
+    data = yaml.safe_load((CATALOGUE / PROPS_FILE).read_text(encoding="utf-8"))
+    return Props(data["version"], data["props"])
+
+
 def resource_hash(*names: str) -> str:
     """Hash of prompt templates + shared context + catalogues used by a stage."""
     blob = "\n".join(prompt(n) for n in names) + shared_context()

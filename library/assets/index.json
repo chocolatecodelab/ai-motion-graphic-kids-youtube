@@ -1,0 +1,37 @@
+[
+  {
+    "asset_id": "glass-prism-a9924f8b",
+    "name": "glass prism",
+    "kind": "svg_prop",
+    "tags": [
+      "light",
+      "science",
+      "attic",
+      "rainbow"
+    ],
+    "file": "assets/svg/glass-prism-a9924f8b.svg",
+    "sha256": "a9924f8bb2b4fa5a3c01a041909c9c6dff102bda5010d463a9babdbb62cf6b72",
+    "created_at": "2026-11-05T04:35:51+00:00",
+    "generator": "claude_cli:sonnet",
+    "prompt_sha256": "01d237c4cdf9e5242903492ee0890b683c9c0aa162882aad2005bfa9573855a1",
+    "licence": "original: generated for this project, all rights owned",
+    "source_episode": "why-is-the-sky-blue"
+  },
+  {
+    "asset_id": "small-mars-rover-293aaa91",
+    "name": "small Mars rover",
+    "kind": "svg_prop",
+    "tags": [
+      "mars",
+      "space",
+      "robot"
+    ],
+    "file": "assets/svg/small-mars-rover-293aaa91.svg",
+    "sha256": "293aaa917c056caff37554f4ee7d3f40eaa12f62f1647e125ad8f3aab51daeab",
+    "created_at": "2026-11-05T04:36:00+00:00",
+    "generator": "claude_cli:sonnet",
+    "prompt_sha256": "32714a444309169e72dd599a7930123c991b262f9799189b46220ac9c67a601e",
+    "licence": "original: generated for this project, all rights owned",
+    "source_episode": "why-is-the-sky-blue"
+  }
+]

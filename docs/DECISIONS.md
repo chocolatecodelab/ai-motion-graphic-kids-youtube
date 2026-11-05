@@ -183,3 +183,14 @@ The owner heard the +3 st rubberband voice as robotic, flat and too fast. Causes
 | Motion | Every scene has ambient motion (drifting clouds, swaying trees and seaweed, waves, rising bubbles, twinkling stars, volcano smoke, bubbling beakers, fireflies, a flickering campfire) that is a pure function of the frame |
 | Composition | Props frame the screen edges and keep the centre clear for the characters; the ground line is at 0.93 H |
 | Contract | The storyboard's `background.theme` accepts all 22 ids (schema + prompt); `theme_for()` keyword fallback updated. Review sheet: `docs/creative/scene_library_v1.png` (`BackgroundSheet` still) |
+## 2026-11-05: visual_plan + assets agents, graphic placement (M2)
+
+| Topic | Decision |
+|---|---|
+| Pipeline | `storyboard → visual_plan → assets → timing` (timing now also waits for the props). Existing episodes get the new jobs with `factory sync` |
+| visual_plan (Sonnet) | Set dressing: 0-4 props per scene that make the place specific to the story. Refs: `builtin:` (12 kit props, `config/catalogue/props_v1.yaml`), `asset:` (library) or `new:` (≤ 4 requests per episode). Code checks: scenes match the storyboard, refs exist, near/front props stay at the edges (x ≤ 0.25 or ≥ 0.75), every request is used, no characters/text/brands. Up to 2 revisions |
+| assets (Sonnet) | Free-first (D2/D8): props are drawn as SVG by the subscription LLM, no image API. Reuse a library asset with the same name first. Output is untrusted: `factory.assetlib.sanitize_svg` parses with defusedxml and re-serialises only allowlisted shape/gradient elements and attributes (no text, scripts, styles, images, links, event handlers or external references), and enforces the house style (viewBox 0 0 400 400, ink outline, ≥ 70% palette colours, size limits). Up to 3 attempts with the problems fed back, then the stage stops for human review |
+| Asset library | `library/assets/index.json` + `library/assets/svg/` (committed). Each record keeps provenance: generator (provider:model), prompt hash, licence (original, owned), source episode; content-hash dedupe |
+| Renderer | Props are drawn on their parallax layer (far/mid/near) or in a new `front` layer in front of the characters; library SVG is inlined from the sanitised markup |
+| Graphic placement | Motion graphics are placed by `scene/placement.ts`: the characters' on-screen boxes are computed per shot and candidate slots (left, right, top band, centre) are scored by overlap, so panels never cover a character. The Recap can stack as a column beside a character. Focus/insert shots keep the large centred panel |
+| Not yet | Vision check of generated assets (spec: cheap vision model) and a perceptual-hash dedupe are deferred to M3 QA; today an owner reviews new assets in the render |

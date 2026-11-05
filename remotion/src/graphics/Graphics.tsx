@@ -189,7 +189,7 @@ const HologramPanel: React.FC<GP> = ({ g, t }) => {
 const Recap: React.FC<GP> = ({ g, t, fps }) => {
   const points = arr(g.props.points).map((x) => str(x));
   return (
-    <div style={{ display: "flex", gap: 26 }}>
+    <div style={{ display: "flex", flexDirection: g.props.layout === "column" ? "column" : "row", gap: 26 }}>
       {points.map((p, i) => {
         const s = spring({ frame: t - i * 18, fps, config: { damping: 14 } });
         return (

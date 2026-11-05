@@ -1,0 +1,17 @@
+# Built-in set-dressing props drawn by the renderer (remotion/src/scene/bg/props.tsx).
+# Sizes are at scale 1 (H = frame height). The visual_plan agent may also reuse library assets
+# (library/assets/index.json) or request new SVG props.
+version: props.v1
+props:
+  tree: {size: "tall, ~0.3H", tags: [nature, outdoor, green]}
+  pine: {size: "tall, ~0.32H", tags: [nature, forest, mountains, snow]}
+  bush: {size: "low, ~0.1H", tags: [nature, garden, berries]}
+  rock: {size: "small, ~0.07H", tags: [nature, ground, desert, mars, cave]}
+  cactus: {size: "~0.22H", tags: [desert, dry, plant]}
+  crystal: {size: "~0.1H, glows", tags: [cave, magic, mineral]}
+  beaker: {size: "~0.1H, bubbling", tags: [lab, science, experiment, chemistry]}
+  globe: {size: "~0.14H on a stand", tags: [geography, earth, study, attic, library]}
+  books: {size: "stack ~0.1H", tags: [study, library, attic, reading]}
+  telescope: {size: "~0.25H on a tripod", tags: [space, stars, astronomy, attic, night]}
+  lantern: {size: "~0.1H, glows", tags: [night, cave, camp, attic, light]}
+  signpost: {size: "~0.22H, arrows without text", tags: [path, trail, adventure, direction]}

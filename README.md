@@ -17,6 +17,7 @@
 **M2 in progress:**
 - on-screen captions (current word highlighted, speaker colour) next to the SRT/VTT files;
 - procedural music bed (one mood per scene, ducked under speech) and synthesized SFX (`src/factory/media/synth.py`), all original audio;
+- visual_plan + assets agents: set dressing per scene from built-in props, the asset library (`library/assets/`, provenance + dedupe) or new SVG props drawn by Claude and passed through a strict sanitizer; collision-aware graphic placement;
 - SVG scene library v1: 22 outlined environments with parallax and ambient motion (`remotion/src/scene/bg/`), review sheet [docs/creative/scene_library_v1.png](docs/creative/scene_library_v1.png) (`npx remotion still BackgroundSheet`);
 - Character Bible v2 ([docs/creative/CHARACTER_BIBLE.md](docs/creative/CHARACTER_BIBLE.md)): **Arka & Lipa** replace Kai & Needle. The owner's React/SVG rig (`remotion/src/rig/`, rig.v2: Arka 14 poses × 10 expressions, Lipa 6 poses × 8 expressions) has been polished for smooth motion: soft joints, an eased walk, pose blending, prop fades, follow-through, and paper-wing flight;
 - reference sheet [docs/creative/reference_sheet_v2.png](docs/creative/reference_sheet_v2.png) and motion check [docs/creative/rig_v2_motion_check.mp4](docs/creative/rig_v2_motion_check.mp4), approved by the owner (`character_version = 2`). Rebuild them in `remotion/` with `npx remotion still CharacterSheet` and `npx remotion render RigCheck`.

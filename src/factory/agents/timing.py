@@ -35,6 +35,7 @@ from factory.schemas.renderplan import (
     PlanCaption,
     PlanGraphic,
     PlanLine,
+    PlanProp,
     PlanScene,
     PlanShot,
     PlanTransition,
@@ -44,6 +45,7 @@ from factory.schemas.renderplan import (
     SfxCue,
 )
 from factory.schemas.storyboard import Storyboard, StoryboardScene
+from factory.schemas.visual import AssetManifest, VisualPlan
 from factory.schemas.voice import Cue, Subtitles, VoiceManifest
 
 FPS = 30
@@ -205,6 +207,30 @@ def transitions(board: Storyboard) -> list[tuple[PlanTransition, PlanTransition]
     return out
 
 
+def scene_props(ctx: StageContext) -> dict[str, list[PlanProp]]:
+    """Visual plan placements -> render-plan props (library SVG inlined, already sanitised)."""
+    from factory.assetlib import AssetLibrary
+
+    plan = load_upstream(ctx, "visual_plan", VisualPlan)
+    manifest = load_upstream(ctx, "assets", AssetManifest)
+    lib = AssetLibrary(Path(ctx.settings.library_dir))
+    out: dict[str, list[PlanProp]] = {}
+    for s in plan.scenes:
+        items = []
+        for p in s.props:
+            kind, _, ref = p.ref.partition(":")
+            common = {"x": p.x, "y": p.y, "scale": p.scale, "depth": p.depth, "flip": p.flip}
+            if kind == "builtin":
+                items.append(PlanProp(kind="builtin", ref=ref, **common))
+                continue
+            asset_id = manifest.resolved.get(ref) if kind == "new" else ref
+            if not asset_id:
+                raise PermanentStageError(f"{s.scene_id}: prop {p.ref} has no asset; re-run assets")
+            items.append(PlanProp(kind="svg", ref=asset_id, svg=lib.svg(asset_id), **common))
+        out[s.scene_id] = items
+    return out
+
+
 SFX_LEAD_S = 0.08
 TRANSITION_SFX = {"compass_portal": ("portal", 0.6), "whip": ("whoosh", 0.3),
                   "zoom_through": ("riser", 0.5), "wipe": ("whoosh", 0.3)}
@@ -236,12 +262,13 @@ def audio_plan(board: Storyboard, scenes: list[PlanScene], scene_starts: list[in
 class TimingStage(Stage):
     name = "timing"
     lane = Lane.MEDIA
-    version = "3"  # v3: SFX cues + music sections; v2: word timings + captions (D7)
-    depends_on = ("storyboard", "voice", "subtitles")
+    version = "4"  # v4: set-dressing props; v3: SFX + music; v2: word timings + captions
+    depends_on = ("storyboard", "voice", "subtitles", "visual_plan", "assets")
     max_attempts = 1
 
     def input_payload(self, ctx: StageContext) -> Mapping[str, Any]:
-        return {k: ctx.upstream[k]["sha256"] for k in ("storyboard", "voice", "subtitles")}
+        return {k: ctx.upstream[k]["sha256"]
+                for k in ("storyboard", "voice", "subtitles", "visual_plan", "assets")}
 
     def run(self, ctx: StageContext) -> StageResult:
         board = load_upstream(ctx, "storyboard", Storyboard)
@@ -277,6 +304,9 @@ class TimingStage(Stage):
         vtt = write_text(cdir, ctx.workdir / "en.vtt", to_vtt(cues))
 
         sfx, music = audio_plan(board, scenes, scene_starts, starts_all)
+        props = scene_props(ctx)
+        for sc in scenes:
+            sc.props = props.get(sc.scene_id, [])
         plan = RenderPlan(episode_slug=board.episode_slug,
                           storyboard_version=int(ctx.upstream["storyboard"]["version"]),
                           fps=FPS, width=board.width, height=board.height, scenes=scenes,

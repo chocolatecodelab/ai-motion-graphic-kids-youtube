@@ -9,12 +9,14 @@ from pathlib import Path
 import pytest
 
 from factory.agents.assemble import AssembleStage
+from factory.agents.assets import AssetsStage
 from factory.agents.brief import BriefStage
 from factory.agents.render import RenderScenesStage
 from factory.agents.script import ScriptStage
 from factory.agents.storyboard import StoryboardStage
 from factory.agents.subtitles import SubtitlesStage
 from factory.agents.timing import TimingStage, mouth_curve, theme_for
+from factory.agents.visual_plan import VisualPlanStage
 from factory.agents.voice import VoiceStage
 from factory.config import Settings
 from factory.media import ffmpeg
@@ -22,8 +24,9 @@ from factory.pipeline import PermanentStageError, StageContext
 from factory.providers.llm.fake import FakeLLM
 from factory.schemas.renderplan import RenderPlan
 from factory.schemas.script import Script
+from factory.schemas.storyboard import Storyboard
 from fakes_media import FakeSTT, FakeTTS
-from helpers import good_draft, storyboard_for, write_brief
+from helpers import GOOD_SVG, good_draft, storyboard_for, visual_plan_for, write_brief
 
 pytestmark = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg required")
 
@@ -73,6 +76,13 @@ def chain(tmp_path: Path) -> dict:
     stt = FakeSTT({ln.line_id: ln.text for ln in script.lines})
     up["voice"] = VoiceStage(FakeTTS(), stt).run(ctx(tmp_path, "voice", up)).output_refs
     up["subtitles"] = SubtitlesStage().run(ctx(tmp_path, "subtitles", up)).output_refs
+    board = Storyboard.model_validate_json(
+        (tmp_path / "content" / up["storyboard"]["path"]).read_text(encoding="utf-8"))
+    ids = [s.scene_id for s in board.scenes]
+    up["visual_plan"] = VisualPlanStage(FakeLLM([visual_plan_for(ids)])).run(
+        ctx(tmp_path, "visual_plan", up)).output_refs
+    up["assets"] = AssetsStage(FakeLLM([{"svg": GOOD_SVG}])).run(
+        ctx(tmp_path, "assets", up)).output_refs
     return up
 
 
@@ -119,6 +129,10 @@ def test_timing_builds_frame_accurate_plan(tmp_path: Path, chain: dict) -> None:
     assert all(m.mood in {"curious", "adventure", "wonder", "mystery", "warm"} for m in plan.music)
     assert all(0 <= c.start_s < plan.total_frames / plan.fps for c in plan.sfx)
     assert any(c.id == "transition_compass_portal" and c.family == "portal" for c in plan.sfx)
+    # Set dressing: built-in rocks everywhere, the generated telescope inlined in scene 1.
+    first = plan.scenes[0].props
+    assert [p.kind for p in first] == ["builtin", "svg"]
+    assert first[1].svg and first[1].svg.startswith("<svg") and "<text" not in first[1].svg
 
 
 def test_mouth_curve_tracks_loudness(tmp_path: Path) -> None:

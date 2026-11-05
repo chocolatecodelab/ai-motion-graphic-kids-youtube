@@ -28,9 +28,18 @@ from factory.schemas.brief import TopicBrief
 from factory.schemas.review import ScriptReviewDraft
 from factory.schemas.script import Script, ScriptDraft
 from factory.schemas.storyboard import StoryboardDraft
+from factory.schemas.visual import SvgDraft, VisualPlanDraft
 from factory.services import approve_stage, create_episode_from_brief
 from factory.workflow import build_workflow
-from helpers import good_draft, pass_review, pilot_brief_dict, storyboard_for, write_brief
+from helpers import (
+    GOOD_SVG,
+    good_draft,
+    pass_review,
+    pilot_brief_dict,
+    storyboard_for,
+    visual_plan_for,
+    write_brief,
+)
 
 
 def ctx_for(tmp_path: Path, stage: str, upstream: dict | None = None) -> StageContext:
@@ -296,6 +305,11 @@ def responder(request: LLMRequest) -> dict:  # type: ignore[type-arg]
         return pass_review()
     if request.schema is StoryboardDraft:
         return storyboard_for(script_model())
+    if request.schema is VisualPlanDraft:
+        board = StoryboardDraft.model_validate(storyboard_for(script_model()))
+        return visual_plan_for([sc.scene_id for sc in board.scenes])
+    if request.schema is SvgDraft:
+        return {"svg": GOOD_SVG}
     raise AssertionError(request.schema)
 
 
@@ -323,7 +337,7 @@ def test_review_rejection_triggers_script_rewrite_end_to_end(tmp_path: Path) -> 
             return next(reviews)
         return responder(request)
 
-    settings = Settings(content_dir=tmp_path / "content",
+    settings = Settings(content_dir=tmp_path / "content", library_dir=tmp_path / "library",
                         publication_mode=PublicationMode.APPROVAL_REQUIRED)
     llm = FakeLLM(responder=loop_responder)
     wf = build_workflow(llm)
@@ -359,7 +373,7 @@ def test_end_to_end_with_approval_gate(tmp_path: Path) -> None:
         finally:
             s.close()
 
-    settings = Settings(content_dir=tmp_path / "content",
+    settings = Settings(content_dir=tmp_path / "content", library_dir=tmp_path / "library",
                         publication_mode=PublicationMode.APPROVAL_REQUIRED)
     llm = FakeLLM(responder=responder)
     wf = build_workflow(llm)
@@ -392,7 +406,7 @@ def test_end_to_end_with_approval_gate(tmp_path: Path) -> None:
         assert html.exists() and "S06" in html.read_text(encoding="utf-8")
         assert s.scalars(select(Approval)).one().decided_by == "owner"
     assert [r.schema.__name__ for r in llm.requests] == [
-        "ScriptDraft", "ScriptReviewDraft", "StoryboardDraft"]
+        "ScriptDraft", "ScriptReviewDraft", "StoryboardDraft", "VisualPlanDraft", "SvgDraft"]
 
     with scope() as s, pytest.raises(ValueError, match="already has episode"):
         create_episode_from_brief(s, brief, settings, wf)
